@@ -1,0 +1,38 @@
+<!-- vim: set syntax=markdown: -->
+
+<!-- livebook:{"persist_outputs":true} -->
+
+# Hello Graphs
+
+## "Hello World" in a graph
+
+From [Exploring Graphs with Elixir](https://www.pragprog.com/titles/thgraphs/exploring-graphs-with-elixir/)
+
+```elixir
+import :digraph
+g = new()
+```
+
+```output
+{:digraph, #Reference<0.3377866312.2421555203.17348>, #Reference<0.3377866312.2421555203.17349>,
+ #Reference<0.3377866312.2421555203.17350>, true}
+```
+
+```elixir
+v1 = add_vertex(g, "Hello")
+v2 = add_vertex(g, "World")
+get_path(g, v1, v2)
+```
+
+```output
+false
+```
+
+```elixir
+add_edge(g, v1, v2)
+get_path(g, v1, v2)
+```
+
+```output
+["Hello", "World"]
+```
