@@ -1,0 +1,81 @@
+<!-- vim: set syntax=markdown: -->
+
+# Advent of Code 2021 - Day 2
+
+## Setup
+
+```elixir
+Mix.install([
+  {:kino, "~> 0.4.1"}
+])
+```
+
+```elixir
+input = Kino.Input.textarea("Please paste your input:")
+```
+
+<!-- livebook:{"reevaluate_automatically":true} -->
+
+```elixir
+input =
+  input
+  |> Kino.Input.read()
+  |> String.split("\n", trim: true)
+  |> Enum.map(fn line ->
+    case line do
+      "forward " <> n -> {:forward, n |> String.to_integer()}
+      "up " <> n -> {:up, n |> String.to_integer()}
+      "down " <> n -> {:down, n |> String.to_integer()}
+    end
+  end)
+```
+
+## Part 1
+
+<!-- livebook:{"reevaluate_automatically":true} -->
+
+```elixir
+input
+|> Enum.map(fn command ->
+  case command do
+    {:forward, n} -> {0, n}
+    {:up, n} -> {-n, 0}
+    {:down, n} -> {n, 0}
+  end
+end)
+|> Enum.reduce(fn {new_depth, new_position}, {depth, position} ->
+  {depth + new_depth, position + new_position}
+end)
+|> Tuple.product()
+```
+
+## Part 1 - Refactor to only use reduce
+
+```elixir
+input
+|> Enum.reduce({depth = 0, position = 0}, fn command, {depth, position} ->
+  case command do
+    {:forward, n} -> {depth, position + n}
+    {:up, n} -> {depth - n, position}
+    {:down, n} -> {depth + n, position}
+  end
+end)
+|> Tuple.product()
+```
+
+## Part 2
+
+<!-- livebook:{"reevaluate_automatically":true} -->
+
+```elixir
+input
+|> Enum.reduce({aim = 0, depth = 0, position = 0}, fn command, {aim, depth, position} ->
+  case command do
+    {:forward, n} -> {aim, depth + aim * n, position + n}
+    {:down, n} -> {aim + n, depth, position}
+    {:up, n} -> {aim - n, depth, position}
+  end
+end)
+|> Tuple.delete_at(0)
+|> Tuple.product()
+```

@@ -1,0 +1,210 @@
+<!-- vim: set syntax=markdown: -->
+
+# Advent of Code 2021 - Day 7
+
+## Setup
+
+```elixir
+Mix.install([
+  {:kino, "~> 0.4.1"},
+  {:math, "~> 0.6.0"},
+  {:vega_lite, "~> 0.1.0"}
+])
+
+alias VegaLite, as: Vl
+```
+
+## Inputs
+
+```elixir
+test_input = "16,1,2,0,4,2,7,1,2,14"
+```
+
+```elixir
+test_input =
+  test_input
+  |> String.split(",")
+  |> Enum.map(&String.to_integer/1)
+```
+
+```elixir
+puzzle_input = Kino.Input.textarea("Please paste your input for Day 7:")
+```
+
+```elixir
+puzzle_input =
+  puzzle_input
+  |> Kino.Input.read()
+  |> String.split(",")
+  |> Enum.map(&String.to_integer/1)
+```
+
+## Part 1 - Test Input
+
+```elixir
+0..Enum.max(test_input)
+|> Enum.map(fn target ->
+  fuel =
+    test_input
+    |> Enum.reduce(0, fn position, acc ->
+      abs(position - target) + acc
+    end)
+
+  %{"target" => target, "fuel" => fuel}
+end)
+|> Enum.min_by(fn %{"fuel" => fuel} ->
+  fuel
+end)
+```
+
+```elixir
+data =
+  0..Enum.max(test_input)
+  |> Enum.map(fn target ->
+    fuel =
+      test_input
+      |> Enum.reduce(0, fn position, acc ->
+        abs(position - target) + acc
+      end)
+
+    %{"target" => target, "fuel" => fuel}
+  end)
+```
+
+```elixir
+Vl.new(width: 400, height: 300)
+|> Vl.data_from_values(data)
+|> Vl.mark(:bar)
+|> Vl.encode_field(:x, "target", type: :nominal)
+|> Vl.encode_field(:y, "fuel", type: :quantitative)
+```
+
+## Part 1 - Puzzle Input
+
+```elixir
+0..Enum.max(puzzle_input)
+|> Enum.map(fn target ->
+  fuel =
+    puzzle_input
+    |> Enum.reduce(0, fn position, acc ->
+      abs(position - target) + acc
+    end)
+
+  %{"target" => target, "fuel" => fuel}
+end)
+|> Enum.min_by(fn %{"fuel" => fuel} ->
+  fuel
+end)
+```
+
+```elixir
+data =
+  0..Enum.max(puzzle_input)
+  |> Enum.map(fn target ->
+    fuel =
+      puzzle_input
+      |> Enum.reduce(0, fn position, acc ->
+        abs(position - target) + acc
+      end)
+
+    %{"target" => target, "fuel" => fuel}
+  end)
+```
+
+```elixir
+Vl.new(width: 400, height: 300)
+|> Vl.data_from_values(data)
+|> Vl.mark(:bar)
+|> Vl.encode_field(:x, "target", type: :quantitative)
+|> Vl.encode_field(:y, "fuel", type: :quantitative)
+```
+
+## Part 2 - Test Input
+
+```elixir
+{
+  16 - 5,
+  15 - 5,
+  14 - 5,
+  13 - 5,
+  12 - 5,
+  11 - 5,
+  10 - 5,
+  9 - 5,
+  8 - 5,
+  7 - 5,
+  6 - 5
+}
+|> Tuple.sum()
+```
+
+```elixir
+{
+  abs(2 - 5),
+  abs(3 - 5),
+  abs(4 - 5)
+}
+|> Tuple.sum()
+```
+
+```elixir
+0..Enum.max(test_input)
+|> Enum.map(fn target ->
+  fuel =
+    test_input
+    |> Enum.reduce(0, fn position, acc ->
+      acc +
+        Enum.reduce(position..target, 0, fn current, fuel ->
+          fuel + abs(current - target)
+        end)
+    end)
+
+  %{"target" => target, "fuel" => fuel}
+end)
+```
+
+## Part 2 - Puzzle Input
+
+```elixir
+calculations = %{
+  "mean" => Math.Enum.mean(puzzle_input),
+  "median" => Math.Enum.median(puzzle_input),
+  "stddev" => Math.Enum.stdev(puzzle_input)
+}
+```
+
+```elixir
+{search_start, search_end} = Enum.min_max(Map.values(calculations))
+```
+
+```elixir
+data =
+  floor(search_start)..ceil(search_end)
+  |> Enum.map(fn target ->
+    fuel =
+      puzzle_input
+      |> Enum.reduce(0, fn position, acc ->
+        acc +
+          Enum.reduce(position..target, 0, fn current, fuel ->
+            fuel + abs(current - target)
+          end)
+      end)
+
+    %{"target" => target, "fuel" => fuel} |> IO.inspect()
+  end)
+```
+
+```elixir
+data
+|> Enum.min_by(fn %{"fuel" => fuel} ->
+  fuel
+end)
+```
+
+```elixir
+Vl.new(width: 400, height: 300)
+|> Vl.data_from_values(data)
+|> Vl.mark(:bar)
+|> Vl.encode_field(:x, "target", type: :quantitative)
+|> Vl.encode_field(:y, "fuel", type: :quantitative)
+```

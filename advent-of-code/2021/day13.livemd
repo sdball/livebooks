@@ -1,0 +1,196 @@
+<!-- vim: set syntax=markdown: -->
+
+# Advent of Code 2021 - Day 13
+
+## Setup
+
+```elixir
+Mix.install([
+  {:kino, "~> 0.4.1"}
+])
+```
+
+## Inputs
+
+```elixir
+test_input = """
+6,10
+0,14
+9,10
+0,3
+10,4
+4,11
+6,0
+6,12
+4,1
+0,13
+10,12
+3,4
+3,0
+8,4
+1,10
+2,14
+8,10
+9,0
+
+fold along y=7
+fold along x=5
+"""
+```
+
+```elixir
+puzzle_input = Kino.Input.textarea("Please paste your puzzle input:")
+```
+
+```elixir
+puzzle_input = Kino.Input.read(puzzle_input)
+```
+
+## Parsing
+
+```elixir
+defmodule Input do
+  def parse(input) do
+    {dots, folds} =
+      input
+      |> String.split("\n", trim: true)
+      |> Enum.split_while(&(not String.starts_with?(&1, "fold")))
+
+    {paper(dots), parse_folds(folds)}
+  end
+
+  def paper(dots) do
+    dots
+    |> Enum.map(fn dot ->
+      [x, y] =
+        dot
+        |> String.split(",")
+        |> Enum.map(&String.to_integer/1)
+
+      {x, y}
+    end)
+  end
+
+  def parse_folds(folds) do
+    folds
+    |> Enum.map(fn fold ->
+      [[direction, fold]] =
+        fold
+        |> String.split("fold along ", trim: true)
+        |> Enum.map(&String.split(&1, "="))
+
+      {String.to_atom(direction), String.to_integer(fold)}
+    end)
+  end
+end
+```
+
+<!-- livebook:{"reevaluate_automatically":true} -->
+
+```elixir
+{dots, folds} =
+  test_input
+  |> Input.parse()
+```
+
+## Paper module
+
+```elixir
+# :x, fold -> fn {x, y} -> {fold - abs(x - fold), y} end
+# :y, fold -> fn {x, y} -> {x, fold - abs(y - fold)} end
+
+defmodule Paper do
+  def fold(paper, {:x, folding_line}) do
+    paper
+    |> Enum.map(fn {x, y} ->
+      {folding_line - abs(x - folding_line), y}
+    end)
+  end
+
+  def fold(paper, {:y, folding_line}) do
+    paper
+    |> Enum.map(fn {x, y} ->
+      {x, folding_line - abs(y - folding_line)}
+    end)
+  end
+
+  def inspect(paper) do
+    {width, _} = Enum.max_by(paper, &elem(&1, 0))
+    {_, height} = Enum.max_by(paper, &elem(&1, 1))
+
+    dots = MapSet.new(paper)
+
+    for y <- 0..height do
+      for x <- 0..width do
+        if {x, y} in dots do
+          IO.write("⬛️")
+        else
+          IO.write("⬜️")
+        end
+      end
+
+      IO.puts("")
+    end
+  end
+end
+```
+
+## Part 1 - Test Input
+
+```elixir
+{paper, folds} =
+  test_input
+  |> Input.parse()
+
+folds
+|> Enum.take(1)
+|> then(fn [fold] ->
+  Paper.fold(paper, fold)
+end)
+|> Enum.uniq()
+|> length()
+```
+
+## Part 1 - Puzzle Input
+
+```elixir
+{paper, folds} =
+  puzzle_input
+  |> Input.parse()
+
+folds
+|> Enum.take(1)
+|> then(fn [fold] ->
+  Paper.fold(paper, fold)
+end)
+|> Enum.uniq()
+|> length()
+```
+
+## Part 2 - Test Input
+
+```elixir
+{paper, folds} =
+  test_input
+  |> Input.parse()
+
+folds
+|> Enum.reduce(paper, fn fold, paper ->
+  Paper.fold(paper, fold)
+end)
+|> Paper.inspect()
+```
+
+## Part 2 - Puzzle Input
+
+```elixir
+{paper, folds} =
+  puzzle_input
+  |> Input.parse()
+
+folds
+|> Enum.reduce(paper, fn fold, paper ->
+  Paper.fold(paper, fold)
+end)
+|> Paper.inspect()
+```

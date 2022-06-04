@@ -1,0 +1,223 @@
+<!-- vim: set syntax=markdown: -->
+
+# Advent of Code 2021 - Day 6
+
+## Setup
+
+```elixir
+Mix.install([
+  {:kino, "~> 0.4.1"},
+  {:vega_lite, "~> 0.1.1"}
+])
+```
+
+## Test Input
+
+```elixir
+test_input = """
+3,4,3,1,2
+"""
+```
+
+```elixir
+test_input =
+  test_input
+  |> String.split([",", "\n"], trim: true)
+  |> Enum.map(&String.to_integer/1)
+```
+
+## Puzzle Input
+
+```elixir
+puzzle_input = Kino.Input.textarea("Please paste your Day 6 puzzle input:")
+```
+
+```elixir
+puzzle_input =
+  puzzle_input
+  |> Kino.Input.read()
+  |> String.split([",", "\n"], trim: true)
+  |> Enum.map(&String.to_integer/1)
+```
+
+## Part 1 - Naive recursion
+
+```elixir
+defmodule NaiveRecursion do
+  def recur(school, day, days_to_model) when day == days_to_model, do: school
+
+  def recur(school, day, days_to_model) do
+    school
+    |> Enum.reduce([], fn fish, new ->
+      next = fish - 1
+
+      case next do
+        -1 ->
+          [6 | [8 | new]]
+
+        _ ->
+          [next | new]
+      end
+    end)
+    |> recur(day + 1, days_to_model)
+  end
+end
+```
+
+```elixir
+NaiveRecursion.recur(test_input, 0, 18) |> Enum.count()
+```
+
+```elixir
+NaiveRecursion.recur(test_input, 0, 80) |> Enum.count()
+```
+
+## Part 1 with puzzle input
+
+```elixir
+NaiveRecursion.recur(puzzle_input, 0, 80) |> Enum.count()
+```
+
+## Part 2 - Cycling the fish counts between days
+
+We don't need to do the work of actually making the lists as describe by the puzzle
+prompt, that's a red herring! We can cycle the fish counts between days. The trick
+is that zero counts will cycle to both 8 and 6.Ï
+
+We model that by using a tuple and recursion. Every recurrance we shift the ages
+down by one day. When rotating from zero we add that number to both the counts of
+fish that are eight days old **and** the counts of fish that are six days old.
+
+Using the naive recursion for 256 days of calculations means computational explosions!
+
+### Many many operations
+
+![](images/day6-list-operations-out-of-control.png)
+
+### Memory before
+
+![](images/day6-memory-before.png)
+
+### Memory during
+
+![](images/day6-memory-during.png)
+
+### Memory after
+
+![](images/day6-memory-after.png)
+
+```elixir
+defmodule TupleRecursion do
+  def recur(school, day, days_to_model) when is_list(school) do
+    school_counts = Enum.frequencies(school)
+
+    0..8
+    |> Enum.map(fn age -> school_counts[age] || 0 end)
+    |> List.to_tuple()
+    |> recur(day + 1, days_to_model)
+  end
+
+  def recur(age_counts, day, days_to_model) when day > days_to_model, do: age_counts
+
+  def recur({age0, age1, age2, age3, age4, age5, age6, age7, age8}, day, days_to_model) do
+    {age1, age2, age3, age4, age5, age6, age7 + age0, age8, age0}
+    |> recur(day + 1, days_to_model)
+  end
+end
+```
+
+## Part 2 with test input
+
+<!-- livebook:{"reevaluate_automatically":true} -->
+
+```elixir
+TupleRecursion.recur(test_input, 0, 18) |> Tuple.sum()
+```
+
+<!-- livebook:{"reevaluate_automatically":true} -->
+
+```elixir
+TupleRecursion.recur(test_input, 0, 80) |> Tuple.sum()
+```
+
+## Part 2 with puzzle input
+
+```elixir
+TupleRecursion.recur(puzzle_input, 0, 256) |> Tuple.sum()
+```
+
+## Animation of growth
+
+Thanks to [this gist by Jonatan Klosko](https://gist.github.com/jonatanklosko/449485d2308a249c87c1f84c78a1a29c)!
+
+```elixir
+school_counts = Enum.frequencies(puzzle_input)
+
+age_counts =
+  0..8
+  |> Enum.map(fn age -> school_counts[age] || 0 end)
+  |> List.to_tuple()
+```
+
+```elixir
+alias VegaLite, as: Vl
+```
+
+```elixir
+graph =
+  Vl.new(height: 300, width: 764)
+  |> Vl.mark(:line)
+  |> Vl.encode_field(:x, "day", type: :quantitative)
+  |> Vl.encode_field(:y, "fish", type: :quantitative)
+  |> Kino.VegaLite.new()
+  |> Kino.render()
+
+Kino.VegaLite.periodically(
+  graph,
+  45,
+  {0, age_counts},
+  fn {day, {t0, t1, t2, t3, t4, t5, t6, t7, t8} = t} ->
+    count = Tuple.sum(t)
+    Kino.VegaLite.push(graph, %{day: day, fish: count})
+
+    if day < 256 do
+      t = {t1, t2, t3, t4, t5, t6, t7 + t0, t8, t0}
+      {:cont, {day + 1, t}}
+    else
+      :halt
+    end
+  end
+)
+```
+
+```elixir
+graph =
+  Vl.new(height: 300, width: 750)
+  |> Vl.mark(:bar)
+  |> Vl.encode_field(:x, "timer", type: :nominal, title: "fish age in days")
+  |> Vl.encode_field(:y, "count", type: :quantitative, title: "fish")
+  |> Kino.VegaLite.new()
+  |> Kino.render()
+
+Kino.VegaLite.periodically(
+  graph,
+  50,
+  {0, age_counts},
+  fn {day, {t0, t1, t2, t3, t4, t5, t6, t7, t8} = t} ->
+    histogram_points =
+      t
+      |> Tuple.to_list()
+      |> Enum.with_index()
+      |> Enum.map(fn {count, timer} -> %{count: count, timer: timer} end)
+
+    Kino.VegaLite.push_many(graph, histogram_points, window: length(histogram_points))
+
+    if day < 256 do
+      t = {t1, t2, t3, t4, t5, t6, t7 + t0, t8, t0}
+      {:cont, {day + 1, t}}
+    else
+      :halt
+    end
+  end
+)
+```

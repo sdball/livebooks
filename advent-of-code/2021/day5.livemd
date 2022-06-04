@@ -1,0 +1,141 @@
+<!-- vim: set syntax=markdown: -->
+
+# Advent of Code 2021 - Day 5
+
+## Setup
+
+```elixir
+Mix.install([
+  {:kino, "~> 0.4.1"}
+])
+```
+
+## Test Input
+
+```elixir
+test_input = """
+0,9 -> 5,9
+8,0 -> 0,8
+9,4 -> 3,4
+2,2 -> 2,1
+7,0 -> 7,4
+6,4 -> 2,0
+0,9 -> 2,9
+3,4 -> 1,4
+0,0 -> 8,8
+5,5 -> 8,2
+"""
+```
+
+## Puzzle Input
+
+```elixir
+puzzle_input = Kino.Input.textarea("Please paste your Day 5 puzzle input here:")
+```
+
+```elixir
+puzzle_input = puzzle_input |> Kino.Input.read()
+```
+
+## Input Parser Module
+
+```elixir
+defmodule Day5.InputParser do
+  def parse(text) do
+    text
+    |> String.split()
+    |> Enum.chunk_every(3)
+    |> Enum.map(fn [xy1, _, xy2] ->
+      {
+        String.split(xy1, ",") |> Enum.map(&String.to_integer/1) |> List.to_tuple(),
+        String.split(xy2, ",") |> Enum.map(&String.to_integer/1) |> List.to_tuple()
+      }
+    end)
+  end
+end
+```
+
+## Vent Scanner Module
+
+```elixir
+defmodule VentScanner do
+  def only_perpendicular(scan) do
+    scan
+    |> Enum.filter(fn {{start_x, start_y}, {end_x, end_y}} ->
+      start_x == end_x or start_y == end_y
+    end)
+  end
+
+  def count_intersections(scan) do
+    scan
+    |> vent_points()
+    |> List.flatten()
+    |> Enum.frequencies()
+    |> Enum.filter(fn {_point, count} ->
+      count >= 2
+    end)
+    |> Enum.count()
+  end
+
+  def vent_points(scan) do
+    scan
+    |> Enum.map(fn vent = {{start_x, start_y}, {end_x, end_y}} ->
+      cond do
+        start_x == end_x ->
+          straight(vent)
+
+        start_y == end_y ->
+          straight(vent)
+
+        true ->
+          diagonal(vent)
+      end
+    end)
+  end
+
+  def straight({{start_x, start_y}, {end_x, end_y}}) do
+    for x <- start_x..end_x,
+        y <- start_y..end_y do
+      {x, y}
+    end
+  end
+
+  def diagonal({{start_x, start_y}, {end_x, end_y}}) do
+    Enum.zip(start_x..end_x, start_y..end_y)
+  end
+end
+```
+
+## Part 1
+
+```elixir
+scan =
+  test_input
+  |> Day5.InputParser.parse()
+  |> VentScanner.only_perpendicular()
+  |> VentScanner.count_intersections()
+```
+
+```elixir
+scan =
+  puzzle_input
+  |> Day5.InputParser.parse()
+  |> VentScanner.only_perpendicular()
+  |> VentScanner.count_intersections()
+```
+
+## Part 2
+
+```elixir
+scan =
+  test_input
+  |> Day5.InputParser.parse()
+  |> VentScanner.count_intersections()
+```
+
+```elixir
+scan =
+  puzzle_input
+  |> Day5.InputParser.parse()
+  |> VentScanner.count_intersections()
+```

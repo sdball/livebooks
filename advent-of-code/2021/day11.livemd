@@ -1,0 +1,185 @@
+<!-- vim: set syntax=markdown: -->
+
+# Advent of Code 2021 - Day 11
+
+## Setup
+
+```elixir
+Mix.install(kino: "~> 0.4.1")
+```
+
+## Test Input
+
+```elixir
+test_input = """
+5483143223
+2745854711
+5264556173
+6141336146
+6357385478
+4167524645
+2176841721
+6882881134
+4846848554
+5283751526
+"""
+```
+
+## Puzzle Input
+
+```elixir
+puzzle_input = Kino.Input.textarea("Please paste your Day 11 puzzle input:")
+```
+
+```elixir
+puzzle_input = Kino.Input.read(puzzle_input)
+```
+
+## Input Parsing
+
+```elixir
+defmodule Octopus do
+  def energy_map(input) do
+    energy_readings =
+      input
+      |> String.split("\n", trim: true)
+      |> Enum.map(fn line ->
+        String.split(line, "", trim: true)
+        |> Enum.map(&String.to_integer/1)
+      end)
+
+    for {line, row} <- Enum.with_index(energy_readings),
+        {energy, column} <- Enum.with_index(line),
+        into: %{} do
+      {{row, column}, energy}
+    end
+  end
+
+  def next(energy_map) do
+    next(Map.keys(energy_map), energy_map, MapSet.new())
+  end
+
+  def next([key | keys], energy_map, flashes) do
+    energy_level = energy_map[key]
+
+    cond do
+      is_nil(energy_level) or key in flashes ->
+        next(keys, energy_map, flashes)
+
+      energy_level >= 9 ->
+        flashes = MapSet.put(flashes, key)
+        energy_map = Map.put(energy_map, key, 0)
+        keys = directions(key) ++ keys
+        next(keys, energy_map, flashes)
+
+      true ->
+        next(keys, Map.put(energy_map, key, energy_level + 1), flashes)
+    end
+  end
+
+  def next([], energy_map, flashes) do
+    {energy_map, MapSet.size(flashes)}
+  end
+
+  def inspect({energy_map, flashes}) do
+    for row <- 0..9 do
+      IO.puts(for column <- 0..9, do: energy_map[{row, column}] + ?0)
+    end
+
+    IO.inspect(flashes, label: "flashes")
+    IO.puts("")
+    energy_map
+  end
+
+  defp directions({row, column}) do
+    ul = {row - 1, column - 1}
+    u = {row - 1, column}
+    ur = {row - 1, column + 1}
+    l = {row, column - 1}
+    r = {row, column + 1}
+    dl = {row + 1, column - 1}
+    d = {row + 1, column}
+    dr = {row + 1, column + 1}
+    [ul, u, ur, l, r, dl, d, dr]
+  end
+end
+```
+
+## Part 1 - Test Input
+
+```elixir
+test_input
+|> Octopus.energy_map()
+|> Octopus.next()
+|> Octopus.inspect()
+|> Octopus.next()
+|> Octopus.inspect()
+```
+
+<!-- livebook:{"reevaluate_automatically":true} -->
+
+```elixir
+energy_map = Octopus.energy_map(test_input)
+
+1..10
+|> Enum.map_reduce(energy_map, fn _iteration, energy_map ->
+  {energy_map, flashes} = Octopus.next(energy_map)
+  {flashes, energy_map}
+end)
+|> elem(0)
+|> Enum.sum()
+```
+
+```elixir
+energy_map = Octopus.energy_map(test_input)
+
+1..100
+|> Enum.map_reduce(energy_map, fn _iteration, energy_map ->
+  {energy_map, flashes} = Octopus.next(energy_map)
+  {flashes, energy_map}
+end)
+|> elem(0)
+|> Enum.sum()
+```
+
+## Part 1 - Puzzle Input
+
+```elixir
+energy_map = Octopus.energy_map(puzzle_input)
+
+1..100
+|> Enum.map_reduce(energy_map, fn _iteration, energy_map ->
+  {energy_map, flashes} = Octopus.next(energy_map)
+  {flashes, energy_map}
+end)
+|> elem(0)
+|> Enum.sum()
+```
+
+## Part 2 - Test Input
+
+```elixir
+Stream.iterate(1, &(&1 + 1))
+|> Enum.reduce_while(Octopus.energy_map(test_input), fn step, energy_map ->
+  {energy_map, flashes} = Octopus.next(energy_map)
+
+  case flashes do
+    100 -> {:halt, step}
+    _ -> {:cont, energy_map}
+  end
+end)
+```
+
+## Part 2 - Puzzle Input
+
+```elixir
+Stream.iterate(1, &(&1 + 1))
+|> Enum.reduce_while(Octopus.energy_map(puzzle_input), fn step, energy_map ->
+  {energy_map, flashes} = Octopus.next(energy_map)
+
+  case flashes do
+    100 -> {:halt, step}
+    _ -> {:cont, energy_map}
+  end
+end)
+```

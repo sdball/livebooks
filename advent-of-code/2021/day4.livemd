@@ -1,0 +1,329 @@
+<!-- vim: set syntax=markdown: -->
+
+# Advent of Code 2021 - Day 4
+
+## Setup
+
+```elixir
+Mix.install([
+  {:kino, "~> 0.4.1"}
+])
+```
+
+## Sample Input
+
+```elixir
+sample_input = Kino.Input.textarea("Please paste the Day 4 sample input:")
+```
+
+## Part 1 - Spike with sample data
+
+```elixir
+[numbers | boards] =
+  sample_input
+  |> Kino.Input.read()
+  |> String.split("\n\n")
+
+numbers =
+  numbers
+  |> String.split(",")
+  |> Enum.map(&String.to_integer/1)
+
+boards =
+  boards
+  |> Enum.map(fn grid ->
+    grid
+    |> String.split("\n")
+    |> Enum.map(fn row ->
+      row |> String.split() |> Enum.map(&String.to_integer(&1))
+    end)
+  end)
+
+board_coordinates =
+  boards
+  |> Enum.map(fn board ->
+    for {line, row} <- Enum.with_index(board),
+        {number, column} <- Enum.with_index(line),
+        into: %{} do
+      {number, {row, column}}
+    end
+  end)
+```
+
+## Module for BingoBoard
+
+```elixir
+defmodule BingoBoard do
+  empty_grid = Tuple.duplicate(false, 5) |> Tuple.duplicate(5)
+  @enforce_keys [:coordinates]
+  defstruct coordinates: %{}, grid: empty_grid
+
+  def new(numbers) do
+    %BingoBoard{coordinates: coordinates(numbers)}
+  end
+
+  def mark(board, number) do
+    case board.coordinates[number] do
+      {row, column} -> put_in(board, access(row, column), true)
+      nil -> board
+    end
+  end
+
+  def unmarked_sum(board) do
+    Enum.sum(
+      for {number, {row, column}} <- board.coordinates,
+          get_in(board, access(row, column)) == false,
+          do: number
+    )
+  end
+
+  def won?(board) do
+    row_won?(board) || column_won?(board)
+  end
+
+  def row_won?(board) do
+    board.grid
+    |> Tuple.to_list()
+    |> Enum.any?(fn row ->
+      row == {true, true, true, true, true}
+    end)
+  end
+
+  def column_won?(board) do
+    for column <- 0..4 do
+      for row <- 0..4 do
+        get_in(board, access(row, column))
+      end
+    end
+    |> Enum.any?(fn column ->
+      column == [true, true, true, true, true]
+    end)
+  end
+
+  defp coordinates(numbers) do
+    for {line, row} <- Enum.with_index(numbers),
+        {number, column} <- Enum.with_index(line),
+        into: %{} do
+      {number, {row, column}}
+    end
+  end
+
+  defp access(row, column) do
+    [Access.key(:grid), Access.elem(row), Access.elem(column)]
+  end
+end
+```
+
+## Sample Input into BingoBoard structs
+
+```elixir
+[numbers | boards] =
+  sample_input
+  |> Kino.Input.read()
+  |> String.split("\n\n")
+
+numbers =
+  numbers
+  |> String.split(",")
+  |> Enum.map(&String.to_integer/1)
+
+boards =
+  boards
+  |> Enum.map(fn grid ->
+    grid
+    |> String.split("\n")
+    |> Enum.map(fn row ->
+      row |> String.split() |> Enum.map(&String.to_integer(&1))
+    end)
+    |> BingoBoard.new()
+  end)
+```
+
+## Mark numbers off bingo boards
+
+```elixir
+board = boards |> Enum.at(0)
+
+board
+|> BingoBoard.mark(13)
+|> BingoBoard.mark(8)
+|> BingoBoard.mark(18)
+```
+
+## Ignore marking numbers that are not on the board
+
+```elixir
+board = boards |> Enum.at(0)
+
+board
+|> BingoBoard.mark(77)
+```
+
+## Detect board that won by row
+
+```elixir
+board = Enum.at(boards, 0)
+BingoBoard.row_won?(board) |> IO.inspect(label: "initial")
+
+[22, 13, 17, 11, 0]
+|> Enum.reduce(board, fn number, board ->
+  BingoBoard.mark(board, number)
+end)
+|> BingoBoard.row_won?()
+```
+
+## Detect board that won by column
+
+```elixir
+board = Enum.at(boards, 0)
+BingoBoard.column_won?(board) |> IO.inspect(label: "initial")
+
+[22, 8, 21, 6, 1]
+|> Enum.reduce(board, fn number, board ->
+  BingoBoard.mark(board, number)
+end)
+|> BingoBoard.column_won?()
+```
+
+## Sum up all unmarked numbers on a bingo board
+
+```elixir
+board = Enum.at(boards, 0)
+
+~w"""
+22 13 17 11  0
+ 8  2 23  4 24
+21  9 14 16  7
+ 6 10  3 18  5
+ 1 12 20 15 19
+"""
+|> Enum.drop(-2)
+|> Enum.map(&String.to_integer/1)
+|> Enum.reduce(board, fn number, board ->
+  BingoBoard.mark(board, number)
+end)
+# should be 15 + 19 == 34
+|> BingoBoard.unmarked_sum()
+```
+
+## Part 1 with Sample Input
+
+```elixir
+numbers
+|> Enum.reduce_while(boards, fn number, boards ->
+  boards = Enum.map(boards, &BingoBoard.mark(&1, number))
+
+  if board = Enum.find(boards, &BingoBoard.won?/1) do
+    {:halt, {number, BingoBoard.unmarked_sum(board)}}
+  else
+    {:cont, ea(boards)}
+  end
+end)
+|> Tuple.product()
+```
+
+## Part 2 with Sample Input
+
+```elixir
+numbers
+|> Enum.reduce_while(boards, fn number, boards ->
+  boards = Enum.map(boards, &BingoBoard.mark(&1, number))
+
+  case Enum.reject(boards, &BingoBoard.won?/1) do
+    [] ->
+      [board] = boards
+      {:halt, {number, BingoBoard.unmarked_sum(board)}}
+
+    boards ->
+      {:cont, boards}
+  end
+end)
+|> Tuple.product()
+```
+
+## Actual Puzzle Input
+
+```elixir
+actual_input = Kino.Input.textarea("Please paste your Day 4 puzzle input:")
+```
+
+## Part 1 with Actual Input
+
+```elixir
+[numbers | boards] =
+  actual_input
+  |> Kino.Input.read()
+  |> String.split("\n\n")
+
+boards =
+  boards
+  |> Enum.map(fn grid ->
+    grid
+    |> String.split("\n")
+    |> Enum.map(fn row ->
+      row |> String.split() |> Enum.map(&String.to_integer(&1))
+    end)
+    |> BingoBoard.new()
+  end)
+
+numbers =
+  numbers
+  |> String.split(",")
+  |> Enum.map(&String.to_integer/1)
+
+numbers
+|> Enum.reduce_while(boards, fn number, boards ->
+  boards = Enum.map(boards, &BingoBoard.mark(&1, number))
+
+  if board = Enum.find(boards, &BingoBoard.won?/1) do
+    {:halt, {number, BingoBoard.unmarked_sum(board)}}
+  else
+    {:cont, boards}
+  end
+end)
+|> Tuple.product()
+```
+
+## Part 2 with Actual Input
+
+```elixir
+numbers
+|> Enum.reduce_while(boards, fn number, boards ->
+  boards = Enum.map(boards, &BingoBoard.mark(&1, number))
+
+  case Enum.reject(boards, &BingoBoard.won?/1) do
+    [] ->
+      [board] = boards
+      {:halt, {number, BingoBoard.unmarked_sum(board)}}
+
+    boards ->
+      {:cont, boards}
+  end
+end)
+|> Tuple.product()
+```
+
+## Scratch (put_in)
+
+```elixir
+grid =
+  {{false, false, false, false, false}, {false, false, false, false, false},
+   {false, false, false, false, false}, {false, false, false, false, false},
+   {false, false, false, false, false}}
+
+row = 0
+column = 1
+put_in(grid, [Access.elem(row), Access.elem(column)], true)
+```
+
+```elixir
+~w"""
+22 13 17 11  0
+ 8  2 23  4 24
+21  9 14 16  7
+ 6 10  3 18  5
+ 1 12 20 15 19
+"""
+|> Enum.map(&String.to_integer/1)
+|> Enum.drop(-2)
+```

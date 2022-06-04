@@ -1,0 +1,533 @@
+<!-- vim: set syntax=markdown: -->
+
+# Advent of Code 2021 - Day 14
+
+## Section
+
+```elixir
+Mix.install([
+  {:kino, "~> 0.4.1"}
+])
+```
+
+## Inputs
+
+```elixir
+test_input = """
+NNCB
+
+CH -> B
+HH -> N
+CB -> H
+NH -> C
+HB -> C
+HC -> B
+HN -> C
+NN -> C
+BH -> H
+NC -> B
+NB -> B
+BN -> B
+BB -> N
+BC -> B
+CC -> N
+CN -> C
+"""
+```
+
+```elixir
+puzzle_input = Kino.Input.textarea("Please paste your puzzle input:")
+```
+
+```elixir
+puzzle_input = Kino.Input.read(puzzle_input)
+```
+
+## Parsing
+
+```elixir
+defmodule Parse do
+  def input(input) do
+    [template | rules] = input |> String.split("\n", trim: true)
+    {template, rules(rules)}
+  end
+
+  def rules(rules) do
+    rules
+    |> Enum.map(fn string ->
+      String.split(string, " -> ")
+    end)
+    |> then(fn rules ->
+      for [pattern | [insert]] <- rules,
+          into: %{},
+          do: {String.to_charlist(pattern), String.to_charlist(insert)}
+    end)
+  end
+end
+```
+
+<!-- livebook:{"reevaluate_automatically":true} -->
+
+```elixir
+{template, rules} =
+  test_input
+  |> Parse.input()
+```
+
+## Exploration
+
+```elixir
+template |> String.to_charlist() |> Enum.chunk_every(2, 1, :discard)
+```
+
+```elixir
+[left, right] = 'NC'
+
+[left, "Z", right] |> List.to_string()
+```
+
+## ——— Part 1 ———
+
+```elixir
+defmodule ProcessTemplate do
+  def process(template, rules) when is_binary(template) do
+    [first | rest] =
+      template
+      |> String.to_charlist()
+      |> Enum.chunk_every(2, 1, :discard)
+
+    [left, right] = first
+    first = [left, rules[first], right]
+
+    rest =
+      rest
+      |> Enum.map(fn [_left, right] = segment ->
+        [rules[segment], right]
+      end)
+
+    first ++ rest
+  end
+
+  def process(template, rules) do
+    process(List.to_string(template), rules)
+  end
+end
+```
+
+## Test Input
+
+<!-- livebook:{"reevaluate_automatically":true} -->
+
+```elixir
+{template, rules} =
+  test_input
+  |> Parse.input()
+
+result =
+  template
+  |> ProcessTemplate.process(rules)
+  |> ProcessTemplate.process(rules)
+  |> ProcessTemplate.process(rules)
+  |> ProcessTemplate.process(rules)
+  |> List.to_string()
+
+result == "NBBNBNBBCCNBCNCCNBBNBBNBBBNBBNBBCBHCBHHNHCBBCBHCB"
+```
+
+```elixir
+{template, rules} =
+  test_input
+  |> Parse.input()
+
+result =
+  template
+  |> ProcessTemplate.process(rules)
+  |> ProcessTemplate.process(rules)
+  |> ProcessTemplate.process(rules)
+  |> ProcessTemplate.process(rules)
+  |> ProcessTemplate.process(rules)
+  |> ProcessTemplate.process(rules)
+  |> ProcessTemplate.process(rules)
+  |> ProcessTemplate.process(rules)
+  |> ProcessTemplate.process(rules)
+  |> ProcessTemplate.process(rules)
+  |> List.flatten()
+  |> Enum.frequencies()
+  |> Enum.min_max_by(fn {_, count} ->
+    count
+  end)
+  |> then(fn {{_, min}, {_, max}} ->
+    max - min
+  end)
+```
+
+## Puzzle Input
+
+```elixir
+{template, rules} =
+  puzzle_input
+  |> Parse.input()
+
+result =
+  template
+  |> ProcessTemplate.process(rules)
+  |> ProcessTemplate.process(rules)
+  |> ProcessTemplate.process(rules)
+  |> ProcessTemplate.process(rules)
+  |> ProcessTemplate.process(rules)
+  |> ProcessTemplate.process(rules)
+  |> ProcessTemplate.process(rules)
+  |> ProcessTemplate.process(rules)
+  |> ProcessTemplate.process(rules)
+  |> ProcessTemplate.process(rules)
+  |> List.flatten()
+  |> Enum.frequencies()
+  |> Enum.min_max_by(fn {_, count} ->
+    count
+  end)
+  |> then(fn {{_, min}, {_, max}} ->
+    max - min
+  end)
+```
+
+## ——— Part 2 ———
+
+## Hmm - rethinking Part 1 and the Test Input
+
+```
+NNCB
+NCNBCHB
+NBCCNBBBCBHCB
+NBBBCNCCNBBNBNBBCHBHHBCHB
+NBBNBNBBCCNBCNCCNBBNBBNBBBNBBNBBCBHCBHHNHCBBCBHCB
+```
+
+Hmm.
+
+```
+NNCB        — NN: 1 NC: 1 CB: 1                          == 1 B, 1 C, 2 N
+NCNBCHB     — NN: 0 NC: 1 CN: 1 NB: 1 BC: 1 CH: 1 HB: 1  == 2 B, 2 C, 1 H, 2 N
+              ^     ^     ^     ^     ^     ^     ^
+
+NCNBCHB*    — NC  CN  NB  BC  CH  HB  B*
+              ^   ^   ^   ^   ^   ^   ^  == 2 B, 2 C, 1 H, 2 N !!!!
+```
+
+We don't need to build the polymer string. Only keep track of the counts of pairs.
+And then to get the character counts we can count the first character of each pair.
+
+```elixir
+{template, rules} =
+  test_input
+  |> Parse.input()
+
+template
+|> String.to_charlist()
+|> Enum.chunk_every(2, 1, [0])
+|> Enum.map(fn [left, _] ->
+  left
+end)
+|> Enum.frequencies()
+```
+
+Test counting up the pairs from the known good generated polymer string.
+If this works then we should be able to count the pairs and not generate the actual string.
+
+```elixir
+{template, rules} =
+  test_input
+  |> Parse.input()
+
+result =
+  template
+  |> ProcessTemplate.process(rules)
+  |> ProcessTemplate.process(rules)
+  |> ProcessTemplate.process(rules)
+  |> ProcessTemplate.process(rules)
+  |> ProcessTemplate.process(rules)
+  |> ProcessTemplate.process(rules)
+  |> ProcessTemplate.process(rules)
+  |> ProcessTemplate.process(rules)
+  |> ProcessTemplate.process(rules)
+  |> ProcessTemplate.process(rules)
+  |> List.flatten()
+  |> Enum.chunk_every(2, 1, [0])
+  |> Enum.map(fn [left, _] ->
+    left
+  end)
+  |> Enum.frequencies()
+```
+
+It works! From the puzzle specification
+
+> After step 10, B occurs 1749 times, C occurs 298 times, H occurs 161 times, and N occurs 865 times
+
+In the actual code we'll need to have a map of how many times each chunk occurs.
+Then we can multiply the first character by the number of times that chunk appears.
+
+```elixir
+test_input_1 = "NNCB"
+test_input_2 = "NCNBCHB"
+test_input_3 = "NBCCNBBBCBHCB"
+test_input_4 = "NBBBCNCCNBBNBNBBCHBHHBCHB"
+test_input_5 = "NBBNBNBBCCNBCNCCNBBNBBNBBBNBBNBBCBHCBHHNHCBBCBHCB"
+```
+
+```elixir
+test_input_1
+|> String.to_charlist()
+|> Enum.chunk_every(2, 1, [0])
+|> Enum.frequencies()
+```
+
+```elixir
+test_input_2
+|> String.to_charlist()
+|> Enum.chunk_every(2, 1, [0])
+|> Enum.frequencies()
+```
+
+```elixir
+test_input_3
+|> String.to_charlist()
+|> Enum.chunk_every(2, 1, [0])
+|> Enum.frequencies()
+```
+
+```elixir
+test_input_4
+|> String.to_charlist()
+|> Enum.chunk_every(2, 1, [0])
+|> Enum.frequencies()
+```
+
+```elixir
+test_input_5
+|> String.to_charlist()
+|> Enum.chunk_every(2, 1, [0])
+|> Enum.frequencies()
+```
+
+Ok I think it's like this. Each applied rule transforms a chunk into two chunks.
+
+RULES
+
+* AA -> B
+* AB -> D
+* BA -> C
+
+TEMPLATE
+
+AA
+
+```
+AA     = AA: 1                                  = 2A
+ABA    = AB: 1 / BA: 1 / A0: 1                  = 2A 1B
+ADBCA  = AD: 1 / DB: 1 / BC: 1 / CA: 1 / A0 : 1 = 2A 1B 1C 1D
+```
+
+Each cycle of the reduce starts a fresh map of pair counts and iterates over the
+previous map of pair counts. Each matching rule turns a pair count into two child
+pairs e.g. "AA" -> ["AB", "BA"].
+
+```elixir
+rules = %{
+  'AA' => 'B',
+  'AB' => 'D',
+  'BA' => 'C'
+}
+
+pairs = 'AAAB' |> Enum.chunk_every(2, 1, [0]) |> Enum.frequencies()
+
+pairs
+|> Enum.reduce(%{}, fn {[left, right] = pair, count}, polymer ->
+  case rules do
+    %{^pair => [insert]} ->
+      # Rule match! Turn the pair into two child pairs in the new polymer.
+      polymer
+      |> Map.update([left, insert], count, &(&1 + count))
+      |> Map.update([insert, right], count, &(&1 + count))
+
+    %{} ->
+      # No match in the rules: pass along to the new polymer unchanged
+      Map.put(polymer, pair, count)
+  end
+end)
+|> Enum.map(fn {[left, _], count} ->
+  List.duplicate(left, count)
+end)
+|> List.flatten()
+|> Enum.frequencies()
+```
+
+## Counting Pairs
+
+```elixir
+defmodule PolymerPairs do
+  def apply(pairs, rules) do
+    pairs
+    |> Enum.reduce(%{}, fn {[left, right] = pair, count}, polymer ->
+      case rules do
+        %{^pair => [insert]} ->
+          # Rule match! Turn the pair into two child pairs in the new polymer.
+          polymer
+          |> Map.update([left, insert], count, &(&1 + count))
+          |> Map.update([insert, right], count, &(&1 + count))
+
+        %{} ->
+          # No match in the rules: pass along to the new polymer unchanged
+          Map.put(polymer, pair, count)
+      end
+    end)
+  end
+
+  def count_input_quantities(frequencies) do
+    Enum.reduce(frequencies, %{}, fn {[input, _], count}, totals ->
+      Map.update(totals, <<input>>, count, fn counted -> count + counted end)
+    end)
+  end
+end
+```
+
+```elixir
+{template, rules} =
+  test_input
+  |> Parse.input()
+
+pairs =
+  template
+  |> String.to_charlist()
+  |> Enum.chunk_every(2, 1, [0])
+  |> Enum.frequencies()
+
+pairs
+|> PolymerPairs.apply(rules)
+|> PolymerPairs.apply(rules)
+|> PolymerPairs.apply(rules)
+|> PolymerPairs.apply(rules)
+|> PolymerPairs.apply(rules)
+|> PolymerPairs.apply(rules)
+|> PolymerPairs.apply(rules)
+|> PolymerPairs.apply(rules)
+|> PolymerPairs.apply(rules)
+|> PolymerPairs.apply(rules)
+|> Enum.map(fn {[left, _], count} ->
+  List.duplicate(left, count)
+end)
+|> List.flatten()
+|> to_string()
+|> String.split("", trim: true)
+|> Enum.frequencies()
+```
+
+```elixir
+{template, rules} =
+  test_input
+  |> Parse.input()
+
+template_pairs =
+  template
+  |> String.to_charlist()
+  |> Enum.chunk_every(2, 1, [0])
+  |> Enum.frequencies()
+
+1..10
+|> Enum.reduce(template_pairs, fn _iteration, polymer ->
+  PolymerPairs.apply(polymer, rules)
+end)
+|> Enum.map(fn {[left, _], count} ->
+  List.duplicate(left, count)
+end)
+|> List.flatten()
+|> to_string()
+|> String.split("", trim: true)
+|> Enum.frequencies()
+```
+
+```elixir
+{template, rules} =
+  test_input
+  |> Parse.input()
+
+template_pairs =
+  template
+  |> String.to_charlist()
+  |> Enum.chunk_every(2, 1, [0])
+  |> Enum.frequencies()
+
+1..10
+|> Enum.reduce(template_pairs, fn _iteration, polymer ->
+  PolymerPairs.apply(polymer, rules)
+end)
+|> PolymerPairs.count_input_quantities()
+```
+
+```elixir
+{template, rules} =
+  test_input
+  |> Parse.input()
+
+template_pairs =
+  template
+  |> String.to_charlist()
+  |> Enum.chunk_every(2, 1, [0])
+  |> Enum.frequencies()
+
+1..40
+|> Enum.reduce(template_pairs, fn _iteration, polymer ->
+  PolymerPairs.apply(polymer, rules)
+end)
+|> PolymerPairs.count_input_quantities()
+```
+
+## Test Input
+
+```elixir
+{template, rules} =
+  test_input
+  |> Parse.input()
+
+template_pairs =
+  template
+  |> String.to_charlist()
+  |> Enum.chunk_every(2, 1, [0])
+  |> Enum.frequencies()
+
+1..40
+|> Enum.reduce(template_pairs, fn _iteration, polymer ->
+  PolymerPairs.apply(polymer, rules)
+end)
+|> PolymerPairs.count_input_quantities()
+|> Enum.min_max_by(fn {_, count} ->
+  count
+end)
+|> then(fn {{_, min}, {_, max}} ->
+  max - min
+end)
+```
+
+## Puzzle Input
+
+```elixir
+{template, rules} =
+  puzzle_input
+  |> Parse.input()
+
+template_pairs =
+  template
+  |> String.to_charlist()
+  |> Enum.chunk_every(2, 1, [0])
+  |> Enum.frequencies()
+
+1..40
+|> Enum.reduce(template_pairs, fn _iteration, polymer ->
+  PolymerPairs.apply(polymer, rules)
+end)
+|> PolymerPairs.count_input_quantities()
+|> Enum.min_max_by(fn {_, count} ->
+  count
+end)
+|> then(fn {{_, min}, {_, max}} ->
+  max - min
+end)
+```

@@ -1,0 +1,183 @@
+<!-- vim: set syntax=markdown: -->
+
+# Advent of Code 2021 - Day 10
+
+## Setup
+
+```elixir
+Mix.install([
+  {:kino, "~> 0.4.1"}
+])
+```
+
+## Inputs
+
+```elixir
+test_input = """
+[({(<(())[]>[[{[]{<()<>>
+[(()[<>])]({[<{<<[]>>(
+{([(<{}[<>[]}>{[]{[(<()>
+(((({<>}<{<{<>}{[]{[]{}
+[[<[([]))<([[{}[[()]]]
+[{[{({}]{}}([{[{{{}}([]
+{<[[]]>}<{[{[{[]{()[[[]
+[<(<(<(<{}))><([]([]()
+<{([([[(<>()){}]>(<<{{
+<{([{{}}[<[[[<>{}]]]>[]]
+"""
+```
+
+```elixir
+puzzle_input = Kino.Input.textarea("Please paste your Day 10 puzzle input:")
+```
+
+```elixir
+puzzle_input = Kino.Input.read(puzzle_input)
+```
+
+## Parsing
+
+```elixir
+test_input = String.split(test_input, "\n", trim: true) |> Enum.map(&to_charlist/1)
+```
+
+```elixir
+puzzle_input = String.split(puzzle_input, "\n", trim: true) |> Enum.map(&to_charlist/1)
+```
+
+## Part 1 - Prep
+
+Huge thanks to José for teaching us [how to write a basic parser](https://github.com/josevalim/aoc/blob/main/2021/day-10.livemd)!
+
+I thrashed around with pieces of this approach using bitstrings and a stack like you can see below; but never quite got it all together until I saw José's example.
+
+```elixir
+defmodule Parser do
+  def parse(line) do
+    parse(line, [])
+  end
+
+  def parse(_line = [], _stack = []), do: :ok
+
+  def parse(_line = [], stack) when length(stack) > 0, do: {:incomplete, stack}
+
+  def parse([char | line], [char | stack]), do: parse(line, stack)
+
+  def parse([char | line], stack) do
+    # IO.inspect(char, label: "char")
+    # IO.inspect(line, label: "line")
+    # IO.inspect(stack, label: "stack")
+    case char do
+      ?( -> parse(line, [?) | stack])
+      ?{ -> parse(line, [?} | stack])
+      ?[ -> parse(line, [?] | stack])
+      ?< -> parse(line, [?> | stack])
+      char -> {:corrupted, char}
+    end
+  end
+
+  def score_corrupted(corrupted) do
+    points = %{
+      ?) => 3,
+      ?] => 57,
+      ?} => 1197,
+      ?> => 25137
+    }
+
+    corrupted
+    |> Enum.reduce(0, fn char, score ->
+      score + points[char]
+    end)
+  end
+
+  def score_incomplete_fixes(fixes) do
+    points = %{
+      ?) => 1,
+      ?] => 2,
+      ?} => 3,
+      ?> => 4
+    }
+
+    fixes
+    |> Enum.map(fn fix ->
+      Enum.reduce(fix, 0, fn char, score ->
+        score * 5 + points[char]
+      end)
+    end)
+    |> Enum.sort()
+    |> Enum.at(floor(length(fixes) / 2))
+  end
+end
+```
+
+```elixir
+Parser.parse('')
+```
+
+```elixir
+Parser.parse('(((})))')
+```
+
+```elixir
+Parser.parse('(')
+```
+
+```elixir
+Parser.parse('()')
+```
+
+```elixir
+Parser.parse('((((')
+```
+
+## Part 1 - Test Input
+
+```elixir
+test_input
+|> Enum.reduce([], fn line, corrupted ->
+  case Parser.parse(line) do
+    {:corrupted, char} -> [char | corrupted]
+    _ -> corrupted
+  end
+end)
+|> Parser.score_corrupted()
+```
+
+## Part 1 - Puzzle Input
+
+```elixir
+puzzle_input
+|> Enum.reduce([], fn line, corrupted ->
+  case Parser.parse(line) do
+    {:corrupted, char} -> [char | corrupted]
+    _ -> corrupted
+  end
+end)
+|> Parser.score_corrupted()
+```
+
+## Part 2 - Test Input
+
+```elixir
+test_input
+|> Enum.reduce([], fn line, all_fixes ->
+  case Parser.parse(line) do
+    {:incomplete, line_fixes} -> [line_fixes | all_fixes]
+    _ -> all_fixes
+  end
+end)
+|> Parser.score_incomplete_fixes()
+```
+
+## Part 2 - Puzzle Input
+
+```elixir
+puzzle_input
+|> Enum.reduce([], fn line, all_fixes ->
+  case Parser.parse(line) do
+    {:incomplete, line_fixes} -> [line_fixes | all_fixes]
+    _ -> all_fixes
+  end
+end)
+|> Parser.score_incomplete_fixes()
+```

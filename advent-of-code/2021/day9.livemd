@@ -1,0 +1,298 @@
+<!-- vim: set syntax=markdown: -->
+
+# Advent of Code 2021 - Day 9
+
+## Setup
+
+```elixir
+Mix.install([
+  {:kino, "~> 0.4.1"},
+  {:vega_lite, "~> 0.1.1"}
+])
+```
+
+```elixir
+alias VegaLite, as: Vl
+```
+
+## Inputs
+
+```elixir
+test_input = """
+2199943210
+3987894921
+9856789892
+8767896789
+9899965678
+"""
+```
+
+```elixir
+test_input =
+  test_input
+  |> String.split("\n", trim: true)
+```
+
+```elixir
+puzzle_input = Kino.Input.textarea("Please paste your day 9 input:")
+```
+
+```elixir
+puzzle_input =
+  puzzle_input
+  |> Kino.Input.read()
+  |> String.split("\n", trim: true)
+```
+
+## Seafloor Mapping - Test Input
+
+First we construct a map (literally a Map) of the seafloor readings.
+
+```elixir
+IO.puts(test_input |> Enum.join("\n"))
+```
+
+```elixir
+Enum.zip(0..9, ?0..?9)
+```
+
+```elixir
+charlists = Enum.map(test_input, &to_charlist/1)
+
+seafloor_map =
+  for {line, row} <- Enum.with_index(charlists),
+      {depth, column} <- Enum.with_index(line),
+      into: %{},
+      do: {{column, row}, depth - ?0}
+```
+
+```elixir
+{
+  seafloor_map[{0, 0}],
+  seafloor_map[{1, 1}],
+  seafloor_map[{1, 2}]
+}
+```
+
+```elixir
+seafloor_graph =
+  seafloor_map
+  |> Enum.map(fn {{x, y}, depth} ->
+    %{"x" => x, "y" => y, "depth" => depth}
+  end)
+```
+
+```elixir
+Vl.new(width: 500, height: 300)
+|> Vl.data_from_values(seafloor_graph)
+|> Vl.mark(:rect, tooltip: [content: "data"])
+|> Vl.encode_field(:x, "x", type: :ordinal)
+|> Vl.encode_field(:y, "y", type: :ordinal)
+|> Vl.encode(:color,
+  field: :depth,
+  type: :quantitative,
+  scale: [
+    range: [
+      "#000",
+      "#116",
+      "#227",
+      "#338",
+      "#449",
+      "#55a",
+      "#66b",
+      "#77c",
+      "#88c",
+      "#eed"
+    ]
+  ],
+  legend: true
+)
+```
+
+## Seafloor Mapping - Puzzle Input
+
+```elixir
+charlists = Enum.map(puzzle_input, &to_charlist/1)
+
+seafloor_map =
+  for {line, row} <- Enum.with_index(charlists),
+      {reading, column} <- Enum.with_index(line),
+      into: %{},
+      do: {{column, row}, reading - ?0}
+```
+
+```elixir
+seafloor_graph =
+  seafloor_map
+  |> Enum.map(fn {{x, y}, depth} ->
+    %{"x" => x, "y" => y, "depth" => depth}
+  end)
+```
+
+```elixir
+Vl.new(width: 600, height: 600)
+|> Vl.data_from_values(seafloor_graph)
+|> Vl.mark(:rect, tooltip: [content: "data"])
+|> Vl.encode_field(:x, "x", type: :ordinal, axis: [labels: false])
+|> Vl.encode_field(:y, "y", type: :ordinal, axis: [labels: false])
+|> Vl.encode(:color,
+  field: :depth,
+  type: :quantitative,
+  scale: [
+    range: [
+      "#000",
+      "#116",
+      "#227",
+      "#338",
+      "#449",
+      "#55a",
+      "#66b",
+      "#77c",
+      "#88c",
+      "#eed"
+    ]
+  ],
+  legend: true
+)
+```
+
+## Part 1 - Test Input
+
+```elixir
+seafloor_map =
+  for {line, row} <- Enum.with_index(test_input),
+      {depth, column} <- Enum.with_index(String.to_charlist(line)),
+      into: %{},
+      do: {{column, row}, depth - ?0}
+
+low_points =
+  seafloor_map
+  |> Enum.filter(fn {{row, column}, depth} ->
+    up = seafloor_map[{row - 1, column}]
+    down = seafloor_map[{row + 1, column}]
+    left = seafloor_map[{row, column - 1}]
+    right = seafloor_map[{row, column + 1}]
+
+    depth < up and depth < down and depth < left and depth < right
+  end)
+
+risk =
+  Enum.reduce(low_points, 0, fn {_point, depth}, risk ->
+    risk + depth + 1
+  end)
+```
+
+## Part 1 - Puzzle Input
+
+```elixir
+seafloor_map =
+  for {line, row} <- Enum.with_index(puzzle_input),
+      {depth, column} <- Enum.with_index(String.to_charlist(line)),
+      into: %{},
+      do: {{column, row}, depth - ?0}
+
+low_points =
+  seafloor_map
+  |> Enum.filter(fn {{row, column}, depth} ->
+    up = seafloor_map[{row - 1, column}]
+    down = seafloor_map[{row + 1, column}]
+    left = seafloor_map[{row, column - 1}]
+    right = seafloor_map[{row, column + 1}]
+
+    depth < up and depth < down and depth < left and depth < right
+  end)
+
+risk =
+  Enum.reduce(low_points, 0, fn {_point, depth}, risk ->
+    risk + depth + 1
+  end)
+```
+
+```elixir
+seen =
+  MapSet.new()
+  |> MapSet.put({0, 1})
+  |> MapSet.put({0, 1})
+  |> MapSet.put({0, 1})
+  |> MapSet.put({2, 1})
+  |> MapSet.put({2, 2})
+
+MapSet.size(seen)
+```
+
+## Scanner Module
+
+```elixir
+defmodule Scanner do
+  def seafloor_map(input) do
+    for {line, row} <- Enum.with_index(input),
+        {depth, column} <- Enum.with_index(String.to_charlist(line)),
+        into: %{},
+        do: {{column, row}, depth - ?0}
+  end
+
+  def low_points(seafloor_map) do
+    seafloor_map
+    |> Enum.filter(fn {{row, column}, depth} ->
+      up = seafloor_map[{row - 1, column}]
+      down = seafloor_map[{row + 1, column}]
+      left = seafloor_map[{row, column - 1}]
+      right = seafloor_map[{row, column + 1}]
+      depth < up and depth < down and depth < left and depth < right
+    end)
+  end
+
+  def basins(seafloor_map) do
+    seafloor_map
+    |> low_points()
+    |> Enum.map(fn {point, _depth} ->
+      basin(MapSet.new(), point, seafloor_map)
+    end)
+  end
+
+  def basin(seen, point, seafloor_map) do
+    depth = seafloor_map[point]
+
+    if point in seen or depth == 9 or depth == nil do
+      seen
+    else
+      {row, column} = point
+      up = {row - 1, column}
+      down = {row + 1, column}
+      left = {row, column - 1}
+      right = {row, column + 1}
+
+      seen
+      |> MapSet.put(point)
+      |> basin(up, seafloor_map)
+      |> basin(down, seafloor_map)
+      |> basin(left, seafloor_map)
+      |> basin(right, seafloor_map)
+    end
+  end
+end
+```
+
+## Part 2 - Test Input
+
+```elixir
+seafloor_map = Scanner.seafloor_map(test_input)
+
+Scanner.basins(seafloor_map)
+|> Enum.map(&MapSet.size/1)
+|> Enum.sort(:desc)
+|> Enum.take(3)
+|> Enum.product()
+```
+
+## Part 2 - Puzzle Input
+
+```elixir
+seafloor_map = Scanner.seafloor_map(puzzle_input)
+
+Scanner.basins(seafloor_map)
+|> Enum.map(&MapSet.size/1)
+|> Enum.sort(:desc)
+|> Enum.take(3)
+|> Enum.product()
+```

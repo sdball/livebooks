@@ -1,0 +1,276 @@
+<!-- vim: set syntax=markdown: -->
+
+# Advent of Code 2021 - Day 8
+
+## Setup
+
+```elixir
+Mix.install([
+  {:kino, "~> 0.4.1"}
+])
+```
+
+## Input
+
+```elixir
+test_input = """
+acedgfb cdfbe gcdfa fbcad dab cefabd cdfgeb eafb cagedb ab | cdfeb fcadb cdfeb cdbaf
+"""
+```
+
+```elixir
+puzzle_input = Kino.Input.textarea("Please paste your puzzle input for Day 8:")
+```
+
+```elixir
+puzzle_input =
+  puzzle_input
+  |> Kino.Input.read()
+  |> String.split("\n")
+```
+
+## Part 1 - Test Input
+
+```elixir
+[digits, readout] = test_input |> String.split([" | ", "\n"], trim: true)
+```
+
+```elixir
+readout
+|> String.split(" ")
+|> Enum.map(&String.to_charlist/1)
+|> Enum.filter(fn reading ->
+  length(reading) in [2, 3, 4, 7]
+end)
+|> Enum.count()
+```
+
+## Part 1 - Puzzle Input
+
+```elixir
+puzzle_input
+|> Enum.map(fn line ->
+  String.split(line, " | ")
+  |> Enum.at(1)
+  |> String.split()
+  |> Enum.map(&String.to_charlist/1)
+  |> Enum.filter(fn readout -> length(readout) in [2, 3, 4, 7] end)
+  |> Enum.count()
+end)
+|> Enum.sum()
+```
+
+## Part 2
+
+```elixir
+typical = %{
+  'abcefg' => 0,
+  'cf' => 1,
+  'acdeg' => 2,
+  'acdfg' => 3,
+  'bcdf' => 4,
+  'abdfg' => 5,
+  'abdefg' => 6,
+  'acf' => 7,
+  'abcdegf' => 8,
+  'abcdfg' => 9
+}
+```
+
+```elixir
+digits
+```
+
+```elixir
+translation = %{
+  ?d => 'a',
+  ?e => 'b',
+  ?a => 'c',
+  ?f => 'd',
+  ?b => 'f',
+  ?\s => ' '
+}
+
+digits
+|> IO.inspect()
+|> String.to_charlist()
+|> Enum.map(fn c ->
+  translation[c] || "_"
+end)
+|> Enum.join("")
+```
+
+```elixir
+'dab' -- 'ab'
+```
+
+```elixir
+'fbcad' -- 'dab'
+```
+
+```elixir
+digits =
+  digits
+  |> String.split()
+  |> Enum.map(&to_charlist/1)
+
+one = Enum.find(digits, fn readout -> length(readout) == 2 end)
+four = Enum.find(digits, fn readout -> length(readout) == 4 end)
+seven = Enum.find(digits, fn readout -> length(readout) == 3 end)
+eight = Enum.find(digits, fn readout -> length(readout) == 7 end)
+
+# with 1 4 7 8 solved then 9 is the only number left that masks 4
+nine =
+  Enum.reject(digits, fn readout -> readout in [one, four, seven, eight] end)
+  |> Enum.find(fn readout -> four -- readout == [] end)
+
+two =
+  Enum.reject(digits, fn readout -> readout in [one, four, seven, eight, nine] end)
+  |> Enum.find(fn readout -> length(four -- readout) == 2 end)
+
+three =
+  Enum.reject(digits, fn readout -> readout in [one, two, four, seven, eight, nine] end)
+  |> Enum.find(fn readout -> length(readout -- two) == 1 end)
+
+five =
+  Enum.reject(digits, fn readout -> readout in [one, two, three, four, seven, eight, nine] end)
+  |> Enum.find(fn readout -> length(readout -- three) == 1 end)
+
+zero =
+  Enum.reject(digits, fn readout ->
+    readout in [one, two, three, four, five, seven, eight, nine]
+  end)
+  |> Enum.find(fn readout -> length(readout -- seven) == 3 end)
+
+[six] =
+  Enum.reject(digits, fn readout ->
+    readout in [zero, one, two, three, four, five, seven, eight, nine]
+  end)
+
+{zero, one, two, three, four, five, six, seven, eight, nine}
+```
+
+```elixir
+defmodule Unscrambler do
+  def unscramble(digits) do
+    digits =
+      digits
+      |> String.split()
+      |> Enum.map(&to_charlist/1)
+
+    one = Enum.find(digits, fn readout -> length(readout) == 2 end)
+    four = Enum.find(digits, fn readout -> length(readout) == 4 end)
+    seven = Enum.find(digits, fn readout -> length(readout) == 3 end)
+    eight = Enum.find(digits, fn readout -> length(readout) == 7 end)
+
+    # with 1 4 7 8 solved then 9 is the only number left that masks 4
+    nine =
+      Enum.reject(digits, fn readout -> readout in [one, four, seven, eight] end)
+      |> Enum.find(fn readout -> four -- readout == [] end)
+
+    two =
+      Enum.reject(digits, fn readout -> readout in [one, four, seven, eight, nine] end)
+      |> Enum.find(fn readout -> length(four -- readout) == 2 end)
+
+    three =
+      Enum.reject(digits, fn readout -> readout in [one, two, four, seven, eight, nine] end)
+      |> Enum.find(fn readout -> length(readout -- two) == 1 end)
+
+    five =
+      Enum.reject(digits, fn readout -> readout in [one, two, three, four, seven, eight, nine] end)
+      |> Enum.find(fn readout -> length(readout -- three) == 1 end)
+
+    zero =
+      Enum.reject(digits, fn readout ->
+        readout in [one, two, three, four, five, seven, eight, nine]
+      end)
+      |> Enum.find(fn readout -> length(readout -- seven) == 3 end)
+
+    [six] =
+      Enum.reject(digits, fn readout ->
+        readout in [zero, one, two, three, four, five, seven, eight, nine]
+      end)
+
+    {zero, one, two, three, four, five, six, seven, eight, nine}
+    |> Tuple.to_list()
+    |> Enum.map(&Enum.sort/1)
+    |> Enum.with_index()
+    |> Map.new()
+  end
+end
+```
+
+```elixir
+[digits, reading] =
+  test_input
+  |> String.split([" | ", "\n"], trim: true)
+
+translation = Unscrambler.unscramble(digits)
+```
+
+```elixir
+[digits, reading] =
+  test_input
+  |> String.split([" | ", "\n"], trim: true)
+
+translation = Unscrambler.unscramble(digits)
+
+reading
+|> String.split()
+|> Enum.map(&to_charlist/1)
+|> Enum.map(fn number ->
+  number = Enum.sort(number)
+  translation[number]
+end)
+```
+
+```elixir
+[digits, reading] =
+  "be cfbegad cbdgef fgaecd cgeb fdcge agebfd fecdb fabcd edb | fdgacbe cefdb cefbgd gcbe"
+  |> String.split([" | ", "\n"], trim: true)
+
+translation = Unscrambler.unscramble(digits)
+
+reading
+|> String.split()
+|> Enum.map(&to_charlist/1)
+|> Enum.map(fn number ->
+  number = Enum.sort(number)
+  translation[number]
+end)
+```
+
+```elixir
+[digits, reading] =
+  puzzle_input
+  |> Enum.at(0)
+  |> String.split(" | ")
+
+translation = Unscrambler.unscramble(digits)
+
+reading
+|> String.split()
+|> Enum.map(&to_charlist/1)
+|> Enum.map(fn number ->
+  number = Enum.sort(number)
+  translation[number]
+end)
+```
+
+```elixir
+puzzle_input
+|> Enum.map(&String.split(&1, " | "))
+|> Enum.map(fn [digits, reading] ->
+  translation = Unscrambler.unscramble(digits)
+
+  reading
+  |> String.split()
+  |> Enum.map(&to_charlist/1)
+  |> Enum.map(fn number ->
+    number = Enum.sort(number)
+    translation[number]
+  end)
+  |> Integer.undigits()
+end)
+|> Enum.sum()
+```

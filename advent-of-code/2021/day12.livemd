@@ -1,0 +1,510 @@
+<!-- vim: set syntax=markdown: -->
+
+# Advent of Code 2021 - Day 12
+
+## Setup
+
+```elixir
+Mix.install([
+  {:libgraph, "~> 0.13.3"},
+  {:kino, "~> 0.4.1"}
+])
+
+alias :digraph, as: Digraph
+```
+
+## Inputs
+
+```elixir
+test_input1 = """
+start-A
+start-b
+A-c
+A-b
+b-d
+A-end
+b-end
+"""
+```
+
+```elixir
+test_input2 = """
+dc-end
+HN-start
+start-kj
+dc-start
+dc-HN
+LN-dc
+HN-end
+kj-sa
+kj-HN
+kj-dc
+"""
+```
+
+```elixir
+test_input3 = """
+fs-end
+he-DX
+fs-he
+start-DX
+pj-DX
+end-zg
+zg-sl
+zg-pj
+pj-he
+RW-he
+fs-DX
+pj-RW
+zg-RW
+start-pj
+he-WI
+zg-he
+pj-fs
+start-RW
+"""
+```
+
+```elixir
+puzzle_text = Kino.Input.textarea("Please paste your puzzle input:")
+```
+
+```elixir
+puzzle_input = Kino.Input.read(puzzle_text)
+```
+
+## ——— Exploration ———
+
+## Test Input - Exploring Erlang digraph
+
+```elixir
+graph = Digraph.new()
+```
+
+```elixir
+cave_start = Digraph.add_vertex(graph, "start")
+cave_end = Digraph.add_vertex(graph, "end")
+cave_A = Digraph.add_vertex(graph, "A")
+cave_b = Digraph.add_vertex(graph, "b")
+cave_c = Digraph.add_vertex(graph, "c")
+cave_d = Digraph.add_vertex(graph, "d")
+
+Digraph.add_edge(graph, cave_start, cave_A)
+Digraph.add_edge(graph, cave_start, cave_b)
+Digraph.add_edge(graph, cave_A, cave_c)
+Digraph.add_edge(graph, cave_A, cave_b)
+Digraph.add_edge(graph, cave_b, cave_d)
+Digraph.add_edge(graph, cave_A, cave_end)
+Digraph.add_edge(graph, cave_b, cave_end)
+
+Digraph.get_path(graph, cave_start, cave_end)
+```
+
+```elixir
+Digraph.vertices(graph)
+```
+
+```elixir
+Digraph.edges(graph)
+```
+
+## Test Input - Exploring Elixir libgraph
+
+```elixir
+graph = Graph.new()
+```
+
+```elixir
+graph1 =
+  test_input1
+  |> String.split("\n", trim: true)
+  |> Enum.map(fn connection ->
+    String.split(connection, "-")
+  end)
+  |> Enum.reduce(Graph.new(), fn [cave, exit], graph ->
+    graph =
+      graph
+      |> Graph.add_vertices([cave, exit])
+      |> Graph.add_edge(cave, exit)
+
+    if cave != "start" and exit != "end" do
+      Graph.add_edge(graph, exit, cave)
+    else
+      graph
+    end
+  end)
+  |> then(fn graph ->
+    graph
+    |> Graph.vertices()
+    |> Enum.reduce(graph, fn cave, graph ->
+      if cave == String.downcase(cave) do
+        Graph.label_vertex(graph, cave, :small)
+      else
+        graph
+      end
+    end)
+  end)
+```
+
+```elixir
+Graph.info(graph1)
+```
+
+```elixir
+Graph.edges(graph1)
+```
+
+```elixir
+Graph.neighbors(graph1, "start")
+```
+
+```elixir
+Graph.out_edges(graph1, "start")
+```
+
+```elixir
+Graph.out_edges(graph1, "A")
+```
+
+```elixir
+Graph.get_paths(graph1, "start", "end")
+```
+
+```elixir
+Graph.reachable_neighbors(graph1, ["start"])
+```
+
+```elixir
+Graph.get_paths(graph1, "d", "end")
+```
+
+```elixir
+Graph.vertices(graph1)
+|> Enum.reject(fn cave -> cave in ~w(start end) end)
+|> Enum.reduce([], fn cave, paths ->
+  Graph.get_paths(graph1, "start", cave) ++ paths
+end)
+|> Enum.map(fn path ->
+  [last | leading] = Enum.reverse(path)
+
+  Graph.get_paths(graph1, last, "end")
+  |> Enum.map(fn path ->
+    Enum.reverse(leading) ++ path
+  end)
+end)
+|> Enum.reduce([], fn ps, paths ->
+  paths ++ ps
+end)
+|> Enum.uniq()
+|> Enum.reject(fn path ->
+  Enum.frequencies(path)
+  |> Map.filter(fn {cave, visits} ->
+    cave == String.downcase(cave) and visits > 1
+  end)
+  |> Map.keys()
+  |> length != 0
+end)
+```
+
+Ok, it's clear I don't have enough Graph data knowledge to effectively work purely within the Graph data and API. But maybe I can still use it as the data structure for recursion.
+
+## Test Input - Recursion over Graph
+
+```elixir
+graph1
+```
+
+```elixir
+Graph.out_edges(graph1, "start")
+```
+
+```elixir
+Graph.out_neighbors(graph1, "start")
+```
+
+```elixir
+Graph.vertex_labels(graph1, "b")
+```
+
+## VerboseCaveSystem Module
+
+```elixir
+defmodule VerboseCaveSystem do
+  def count_paths(graph) do
+    outs = Graph.out_neighbors(graph, "start")
+    count_paths(outs, graph, MapSet.new(), ["start"], 0)
+  end
+
+  def count_paths(["end" | caves], graph, visited_small_caves, path, path_count) do
+    IO.puts(
+      "I reached the end of the caves! My path so far #{inspect(Enum.reverse(["end" | path]))}"
+    )
+
+    IO.puts("EXITED\n")
+    count_paths(caves, graph, visited_small_caves, path, path_count + 1)
+  end
+
+  def count_paths([cave | caves], graph, visited_small_caves, path, path_count) do
+    path_count =
+      cond do
+        cave in visited_small_caves ->
+          IO.puts(
+            "Oh no I'm back in the small cave #{cave}. My path so far #{inspect(Enum.reverse([cave | path]))}"
+          )
+
+          IO.puts("END OF PATH\n")
+          path_count
+
+        :small in Graph.vertex_labels(graph, cave) ->
+          IO.puts(
+            "Oh nice, a small cave called #{cave}. My path so far #{inspect(Enum.reverse([cave | path]))}"
+          )
+
+          outs = Graph.out_neighbors(graph, cave)
+
+          count_paths(
+            outs,
+            graph,
+            MapSet.put(visited_small_caves, cave),
+            [cave | path],
+            path_count
+          )
+
+        true ->
+          IO.puts(
+            "I am in a large cave called #{cave}. My path so far #{inspect(Enum.reverse([cave | path]))}"
+          )
+
+          outs = Graph.out_neighbors(graph, cave)
+          count_paths(outs, graph, visited_small_caves, [cave | path], path_count)
+      end
+
+    if path_count > 0 do
+      IO.puts("Wow I found #{path_count} paths to the exit!")
+
+      if length(caves) > 0 do
+        IO.puts("But I have more caves to explore: #{inspect(caves)}\n")
+      end
+    else
+      IO.puts("All those paths and I didn't find any new ways to the exit.")
+      IO.puts("But I have more caves to explore: #{inspect(caves)}\n")
+    end
+
+    count_paths(caves, graph, visited_small_caves, path, path_count)
+  end
+
+  def count_paths(_caves = [], _graph, _visited_small_caves, _path, path_count), do: path_count
+end
+```
+
+<!-- livebook:{"reevaluate_automatically":true} -->
+
+```elixir
+VerboseCaveSystem.count_paths(graph1)
+```
+
+## ——— Solving ———
+
+## Input Parser
+
+```elixir
+defmodule Input do
+  def to_graph(input) do
+    input
+    |> String.split("\n", trim: true)
+    |> Enum.map(fn connection ->
+      String.split(connection, "-")
+    end)
+    |> Enum.reduce(Graph.new(), fn [cave1, cave2], graph ->
+      graph
+      |> Graph.add_vertices([cave1, cave2])
+      |> maybe_add_edge(cave1, cave2)
+      |> maybe_add_edge(cave2, cave1)
+    end)
+    |> then(fn graph ->
+      graph
+      |> Graph.vertices()
+      |> Enum.reduce(graph, fn cave1, graph ->
+        if cave1 == String.downcase(cave1) do
+          Graph.label_vertex(graph, cave1, :small)
+        else
+          graph
+        end
+      end)
+    end)
+  end
+
+  defp maybe_add_edge(graph, "end", _), do: graph
+  defp maybe_add_edge(graph, _, "start"), do: graph
+
+  defp maybe_add_edge(graph, cave1, cave2) do
+    Graph.add_edge(graph, cave1, cave2)
+  end
+end
+```
+
+## ——— Part 1 ———
+
+## CaveSystem module
+
+```elixir
+defmodule CaveSystem do
+  def count_paths(graph) do
+    outs = Graph.out_neighbors(graph, "start")
+    count_paths(outs, graph, MapSet.new(), ["start"], 0)
+  end
+
+  def count_paths(["end" | caves], graph, visited_small_caves, path, path_count) do
+    count_paths(caves, graph, visited_small_caves, path, path_count + 1)
+  end
+
+  def count_paths([cave | caves], graph, visited_small_caves, path, path_count) do
+    path_count =
+      cond do
+        cave in visited_small_caves ->
+          path_count
+
+        :small in Graph.vertex_labels(graph, cave) ->
+          outs = Graph.out_neighbors(graph, cave)
+
+          count_paths(
+            outs,
+            graph,
+            MapSet.put(visited_small_caves, cave),
+            [cave | path],
+            path_count
+          )
+
+        true ->
+          outs = Graph.out_neighbors(graph, cave)
+          count_paths(outs, graph, visited_small_caves, [cave | path], path_count)
+      end
+
+    count_paths(caves, graph, visited_small_caves, path, path_count)
+  end
+
+  def count_paths(_caves = [], _graph, _visited_small_caves, _path, path_count), do: path_count
+end
+```
+
+## Part 1 - Test Input 1
+
+```elixir
+test_input1
+|> Input.to_graph()
+|> CaveSystem.count_paths()
+```
+
+## Part 1 - Test Input 2
+
+```elixir
+test_input2
+|> Input.to_graph()
+|> CaveSystem.count_paths()
+```
+
+## Part 1 - Test Input 3
+
+```elixir
+test_input3
+|> Input.to_graph()
+|> CaveSystem.count_paths()
+```
+
+## Part 1 - Puzzle Input
+
+```elixir
+puzzle_input
+|> Input.to_graph()
+|> CaveSystem.count_paths()
+```
+
+## ——— Part 2 ———
+
+## OneSmallVisitTwiceCaveSystem Module
+
+```elixir
+defmodule OneSmallVisitTwiceCaveSystem do
+  def count_paths(graph) do
+    outs = Graph.out_neighbors(graph, "start")
+    count_paths(outs, graph, MapSet.new(), false, ["start"], 0)
+  end
+
+  def count_paths(["end" | caves], graph, visited_small_caves, twice?, path, path_count) do
+    count_paths(caves, graph, visited_small_caves, twice?, path, path_count + 1)
+  end
+
+  def count_paths([cave | caves], graph, visited_small_caves, twice?, path, path_count) do
+    path_count =
+      cond do
+        cave in visited_small_caves and twice? ->
+          path_count
+
+        cave in visited_small_caves ->
+          outs = Graph.out_neighbors(graph, cave)
+
+          count_paths(
+            outs,
+            graph,
+            MapSet.put(visited_small_caves, cave),
+            true,
+            [cave | path],
+            path_count
+          )
+
+        :small in Graph.vertex_labels(graph, cave) ->
+          outs = Graph.out_neighbors(graph, cave)
+
+          count_paths(
+            outs,
+            graph,
+            MapSet.put(visited_small_caves, cave),
+            twice?,
+            [cave | path],
+            path_count
+          )
+
+        true ->
+          outs = Graph.out_neighbors(graph, cave)
+          count_paths(outs, graph, visited_small_caves, twice?, [cave | path], path_count)
+      end
+
+    count_paths(caves, graph, visited_small_caves, twice?, path, path_count)
+  end
+
+  def count_paths(_caves = [], _graph, _visited_small_caves, _twice, _path, path_count),
+    do: path_count
+end
+```
+
+## Part 2 - Test Input 1
+
+```elixir
+test_input1
+|> Input.to_graph()
+|> OneSmallVisitTwiceCaveSystem.count_paths()
+```
+
+## Part 2 - Test Input 2
+
+```elixir
+test_input2
+|> Input.to_graph()
+|> OneSmallVisitTwiceCaveSystem.count_paths()
+```
+
+## Part 2 - Test Input 3
+
+```elixir
+test_input3
+|> Input.to_graph()
+|> OneSmallVisitTwiceCaveSystem.count_paths()
+```
+
+## Part 2 - Puzzle Input
+
+```elixir
+puzzle_input
+|> Input.to_graph()
+|> OneSmallVisitTwiceCaveSystem.count_paths()
+```

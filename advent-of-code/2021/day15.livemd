@@ -1,0 +1,385 @@
+<!-- vim: set syntax=markdown: -->
+
+# Advent of Code 2021 - Day 15
+
+## Setup
+
+```elixir
+Mix.install([
+  {:kino, "~> 0.4.1"},
+  {:libgraph, git: "https://github.com/bitwalker/libgraph", branch: "main"}
+])
+```
+
+## Inputs
+
+```elixir
+test_input = """
+1163751742
+1381373672
+2136511328
+3694931569
+7463417111
+1319128137
+1359912421
+3125421639
+1293138521
+2311944581
+"""
+```
+
+```elixir
+puzzle_input = Kino.Input.textarea("Please paste your puzzle input:")
+```
+
+```elixir
+puzzle_input = Kino.Input.read(puzzle_input)
+```
+
+## Exploration
+
+```elixir
+graph =
+  Graph.new(vertex_identifier: fn v -> v end)
+  |> Graph.add_vertex({0, 0})
+  |> Graph.add_vertex({0, 1})
+  |> Graph.add_vertex({0, 2})
+  |> Graph.add_vertex({0, 3})
+  |> Graph.add_vertex({1, 0})
+  |> Graph.add_vertex({1, 1})
+  |> Graph.add_vertex({1, 2})
+  |> Graph.add_vertex({1, 3})
+  |> Graph.add_edge({0, 0}, {0, 1}, weight: 1)
+  |> Graph.add_edge({0, 1}, {0, 2}, weight: 6)
+  |> Graph.add_edge({0, 2}, {0, 3}, weight: 3)
+  |> Graph.add_edge({0, 0}, {1, 0}, weight: 1)
+  |> Graph.add_edge({1, 0}, {1, 1}, weight: 3)
+  |> Graph.add_edge({1, 1}, {1, 2}, weight: 8)
+
+Graph.get_shortest_path(graph, {0, 0}, {1, 2})
+```
+
+## Part 1 - Input
+
+```elixir
+defmodule Input do
+  def to_map(input) do
+    charlists = Enum.map(String.split(input, "\n", trim: true), &to_charlist/1)
+
+    for {line, column} <- Enum.with_index(charlists),
+        {danger, row} <- Enum.with_index(line),
+        into: %{},
+        do: {{column, row}, danger - ?0}
+  end
+
+  def to_graph(danger_map) do
+    graph = Graph.new(vertex_identifier: fn v -> v end)
+
+    Enum.reduce(danger_map, graph, fn {{row, column} = point, _danger}, graph ->
+      up = {row - 1, column}
+      down = {row + 1, column}
+      left = {row, column - 1}
+      right = {row, column + 1}
+
+      graph
+      |> Graph.add_vertex({row, column})
+      |> maybe_add_edge(point, up, danger_map[up])
+      |> maybe_add_edge(point, down, danger_map[down])
+      |> maybe_add_edge(point, left, danger_map[left])
+      |> maybe_add_edge(point, right, danger_map[right])
+    end)
+  end
+
+  def maybe_add_edge(graph, _point, _destination, nil), do: graph
+
+  def maybe_add_edge(graph, point, destination, danger) do
+    Graph.add_edge(graph, point, destination, weight: danger)
+  end
+end
+```
+
+## Part 1 - Test Input
+
+```elixir
+danger_map = Input.to_map(test_input)
+{{start, _}, {final, _}} = Enum.min_max(danger_map)
+graph = Input.to_graph(danger_map)
+
+Graph.get_shortest_path(graph, start, final)
+# don't count the first cell
+|> Enum.drop(1)
+|> Enum.reduce(0, fn cell, total ->
+  total + danger_map[cell]
+end)
+```
+
+## Part 1 - Puzzle Input
+
+```elixir
+danger_map = Input.to_map(puzzle_input)
+{{start, _}, {final, _}} = Enum.min_max(danger_map)
+graph = Input.to_graph(danger_map)
+
+Graph.get_shortest_path(graph, start, final)
+# don't count the first cell
+|> Enum.drop(1)
+|> Enum.reduce(0, fn cell, total ->
+  total + danger_map[cell]
+end)
+```
+
+## Part 2 - Generate Bigger Map
+
+```elixir
+danger_map = Input.to_map(test_input) |> GenerateBiggerMap.generate()
+{{start, _}, {final, _}} = Enum.min_max(danger_map)
+```
+
+```elixir
+sample = """
+11
+11
+"""
+
+danger_map = Input.to_map(sample)
+
+Enum.reduce(danger_map, danger_map, fn {{row, column}, danger}, danger_map ->
+  Map.put(danger_map, {row + 1, column}, danger + 99)
+end)
+```
+
+To transform the starting map to the part 2 map I'll need its width and height
+to know how much to offset the points. I think this could all be done in a reduce
+but using a module will be easier to think through.
+
+Another approach could be to duplicate the original map and then increase its danger N times
+and concatenate it with the expanding map.
+
+## Module BigMap
+
+```elixir
+defmodule BigMap do
+  def generate(danger_map, scale) do
+    generate(danger_map, offset(danger_map), scale)
+  end
+
+  def generate(danger_map, offset, scale) do
+    Enum.reduce(danger_map, danger_map, fn {point, danger}, danger_map ->
+      additional_points(point, offset, scale)
+      |> Enum.reduce(danger_map, fn {point, additional_danger}, danger_map ->
+        Map.put_new(danger_map, point, next(danger, additional_danger))
+      end)
+    end)
+  end
+
+  def additional_points({start_row, start_column}, offset, scale) do
+    for row_scale <- 0..(scale - 1),
+        column_scale <- 0..(scale - 1) do
+      offset_count = row_scale + column_scale
+      {{start_row + offset * row_scale, start_column + offset * column_scale}, offset_count}
+    end
+  end
+
+  def offset(danger_map) do
+    {{start, _}, {final, _}} = Enum.min_max(danger_map)
+    row(final) - row(start) + 1
+  end
+
+  def map_bounds(danger_map) do
+    {{start, _}, {final, _}} = Enum.min_max(danger_map)
+    {row(start), row(final)}
+  end
+
+  def row(point) do
+    elem(point, 0)
+  end
+
+  def column(point) do
+    elem(point, 1)
+  end
+
+  def next(danger, additional) do
+    new_danger = danger + additional
+    if new_danger >= 10, do: new_danger - 9, else: new_danger
+  end
+
+  def inspect(danger_map) do
+    {start, final} = map_bounds(danger_map)
+
+    for row <- start..final do
+      for column <- start..final do
+        IO.write(" #{danger_map[{row, column}]} ")
+      end
+
+      IO.puts("")
+    end
+
+    danger_map
+  end
+end
+```
+
+Let's say there's a map with offset = 2
+
+e.g.
+
+```
+12
+23
+```
+
+and we want to scale it to 2x2
+
+That means each point would get THREE additional points.
+
+e.g. {0,0}
+
+* {0,0} <- start
+* {0,2} <- right chunk
+* {2,0} <- below chunk
+* {2,2} <- below right chunk
+
+```
+  01 23
+
+0 12 X.
+1 23 ..
+
+2 X. X.
+3 .. ..
+```
+
+How about 3x3?
+
+```
+scale = 3
+offset = 2
+```
+
+e.g. {0,0}
+
+row + offset * 0
+
+* {0,0} <- column + offset * 0
+* {0,2} <- column + offset * 1
+* {0,4} <- column + offset * 2
+
+row + offset * 1
+
+* {2,0} <- column + offset * 0
+* {2,2} <- column + offset * 1
+* {2,4} <- column + offset * 2
+
+row + offset * 2
+
+* {4,0} <- column + offset * 0
+* {4,2} <- column + offset * 1
+* {4,4} <- column + offset * 2
+
+```
+  01 23 45
+
+0 12 X. X.
+1 23 .. ..
+
+2 X. X. X.
+3 .. .. ..
+
+4 X. X. X.
+5 .. .. ..
+```
+
+```elixir
+BigMap.additional_points({0, 0}, 2, 2)
+```
+
+```elixir
+BigMap.additional_points({1, 1}, 2, 2)
+```
+
+```elixir
+BigMap.additional_points({0, 0}, 2, 3)
+```
+
+```elixir
+BigMap.additional_points({1, 0}, 2, 3)
+```
+
+```elixir
+BigMap.additional_points({1, 1}, 2, 3)
+```
+
+## Part 2 - Generating the Expanded Map
+
+<!-- livebook:{"reevaluate_automatically":true} -->
+
+```elixir
+sample = """
+116
+138
+213
+"""
+
+danger_map = Input.to_map(sample)
+
+BigMap.generate(danger_map, 3)
+|> BigMap.inspect()
+```
+
+## Part 2 - Test Input
+
+```elixir
+danger_map = Input.to_map(test_input) |> BigMap.generate(5)
+{{start, _}, {final, _}} = Enum.min_max(danger_map)
+graph = Input.to_graph(danger_map)
+
+Graph.get_shortest_path(graph, start, final)
+# don't count the first cell
+|> Enum.drop(1)
+|> Enum.reduce(0, fn cell, total ->
+  total + danger_map[cell]
+end)
+```
+
+## Part 2 - Puzzle Input
+
+```elixir
+danger_map = Input.to_map(puzzle_input) |> BigMap.generate(5)
+{{start, _}, {final, _}} = Enum.min_max(danger_map)
+graph = Input.to_graph(danger_map)
+
+Graph.get_shortest_path(graph, start, final)
+# don't count the first cell
+|> Enum.drop(1)
+|> Enum.reduce(0, fn cell, total ->
+  total + danger_map[cell]
+end)
+```
+
+## Bug in libgraph 0.13.3 (FIXED)
+
+`1386` is not the right answer! Hmm!
+
+Testing other solutions the answer I need for my puzzle input is `2872`. Hmm!
+
+Aha! https://github.com/bitwalker/libgraph/issues/44
+
+If that issue the problem then my graph does not have the expected number of points.
+
+```elixir
+# => 250000
+danger_map |> Map.keys() |> length()
+```
+
+```elixir
+# => 249993
+Graph.vertices(graph) |> length()
+```
+
+Well that is indeed the problem!
+
+Time to upgrade libgraph.
+
+NOTE since libgraph is updated and using the vertex_id function then if you run this
+livebook you should see both cells outputting 250000. If they are not then a bug has been
+reintroduced somewhere.
