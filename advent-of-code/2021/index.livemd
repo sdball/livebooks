@@ -1,4 +1,6 @@
-# Advent of Code 2021 solutions
+# Advent of Code 2021
+
+## Working solutions
 
 * [Day 1](day1.livemd)
 * [Day 2](day2.livemd)
