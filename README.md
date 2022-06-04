@@ -1,10 +1,5 @@
-# livebooks
+# Stephen's Elixir Livebooks
 
-# Elixir Livebooks
+[![Run in Livebook](https://livebook.dev/badge/v1/blue.svg)](https://livebook.dev/run?url=https%3A%2F%2Fgithub.com%2Fsdball%2Flivebooks%2Fblob%2Fmain%2Findex.livemd)
 
-Interesting and useful Livebooks!
-
-## Links
-
-- [sdball/advent-of-code/2021](https://github.com/sdball/advent-of-code/tree/main/2021)
-
+Or you can click around the livemd files but what fun is that?

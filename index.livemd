@@ -1,0 +1,19 @@
+# Stephen Ball's Livebooks
+
+Hello!
+
+Thanks to @jonatanklosko and his [notebooks repo](https://github.com/jonatanklosko/notebooks) for the inspiration.
+
+Hopefully if you're reading this you clicked the "Run in Livebook" button. That means you can read and execute any code you see here directly. Like blog posts but interactive!
+
+## Demonstrations
+
+* [Hello World in digraph](demos/hello-graphs.livemd)
+
+## Book notes
+
+* [Concurrent Data Processing in Elixir](books/concurrent-data-processing-in-elixir-index.livemd)
+
+## Advent of code
+
+* [2021](advent-of-code/2021/index.livemd)
