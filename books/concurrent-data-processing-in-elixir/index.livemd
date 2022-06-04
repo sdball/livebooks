@@ -7,3 +7,14 @@
 [![Concurrent Data Processing in Elixir book cover](images/concurrent-data-processing-in-elixir.jpeg)](https://pragprog.com/titles/sgdpelixir/concurrent-data-processing-in-elixir/)
 
 High level notes and code examples.
+
+## Chapter 1
+
+* [Tasks and results](chapter1_tasks-and-results.livemd)
+
+## Chapter 2
+
+* [GenServer Intro](chapter2_genserver-intro.livemd)
+* [Building a job processing system out of GenServers](chapter2_job-processing.livemd)
+* [Introducing DynamicSupervisor](chapter2_dynamic-supervisor.livemd)
+* [Implementing a supervisor](chapter2_implementing-supervisor.livemd)

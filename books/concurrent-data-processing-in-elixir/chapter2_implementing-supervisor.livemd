@@ -1,0 +1,202 @@
+<!-- vim: set syntax=markdown: -->
+
+# Chapter 2 - Implementing a Supervisor
+
+## Intro
+
+So far we've used two types of supervisors `Task.Supervisor` and `DynamicSupervisor`.
+
+They both allow starting processes on demand but they're both made with a specific goal
+in mind and sometimes we need more flexibility over how the supervisor works.
+
+In practice you'll often use the supervisor behavior to create your own supervisors.
+
+Our supervisor will have a restart value of `:temporary` which means nothing will happen
+if the supervisor itself exits or even crashes.
+
+```elixir
+defmodule Jobber.JobSupervisor do
+  use Supervisor, restart: :temporary
+
+  def start_link(args) do
+    Supervisor.start_link(__MODULE__, args)
+  end
+
+  def init(args) do
+    children = [
+      {Jobber.Job, args}
+    ]
+
+    options = [
+      strategy: :one_for_one,
+      max_seconds: 30
+    ]
+
+    Supervisor.init(children, options)
+  end
+end
+```
+
+Modify `Jobber.start_job/1` to start a `JobSupervisor` instead of a `Job`
+
+```elixir
+defmodule Jobber do
+  alias Jobber.{JobRunner, JobSupervisor}
+
+  def start_job(args) do
+    IO.inspect("Jobber starting job #{inspect(args)}")
+    DynamicSupervisor.start_child(JobRunner, {JobSupervisor, args})
+  end
+end
+```
+
+`Jobber.Job` is unchanged from the previous Livebook
+
+```elixir
+defmodule Jobber.Job do
+  defstruct [:work, :id, :max_retries, retries: 0, status: "new"]
+  use GenServer, restart: :transient
+  require Logger
+
+  def init(args) do
+    work = Keyword.fetch!(args, :work)
+    id = Keyword.get(args, :id, random_job_id())
+    max_retries = Keyword.get(args, :max_retries, 3)
+
+    state = %Jobber.Job{id: id, work: work, max_retries: max_retries}
+    {:ok, state, {:continue, :run}}
+  end
+
+  def handle_continue(:run, state) do
+    new_state =
+      state.work.()
+      |> handle_job_result(state)
+
+    if new_state.status == "errored" do
+      Process.send_after(self(), :retry, 5000)
+      {:noreply, new_state}
+    else
+      Logger.info("Job exiting #{state.id}")
+      {:stop, :normal, new_state}
+    end
+  end
+
+  def handle_info(:retry, state) do
+    {:noreply, state, {:continue, :run}}
+  end
+
+  def start_link(args) do
+    GenServer.start_link(__MODULE__, args)
+  end
+
+  defp random_job_id() do
+    :crypto.strong_rand_bytes(5)
+    |> Base.url_encode64(padding: false)
+  end
+
+  defp handle_job_result({:ok, _data}, state) do
+    Logger.info("Job completed #{state.id}")
+    %Jobber.Job{state | status: "done"}
+  end
+
+  defp handle_job_result(:error, %{status: "new"} = state) do
+    Logger.warn("Job errored #{state.id}")
+    %Jobber.Job{state | status: "errored"}
+  end
+
+  defp handle_job_result(:error, %{status: "errored"} = state) do
+    Logger.warn("Job retry failed #{state.id}")
+    new_state = %Jobber.Job{state | retries: state.retries + 1}
+
+    if new_state.retries == state.max_retries do
+      %Jobber.Job{new_state | status: "failed"}
+    else
+      new_state
+    end
+  end
+end
+```
+
+## Now job crashes no longer take down JobRunner
+
+With the JobSupervisor as a layer between Job and JobRunner any job crashes are
+now isolated.
+
+```elixir
+good_job = fn ->
+  Process.sleep(1000)
+  {:ok, []}
+end
+
+bad_job = fn ->
+  Process.sleep(1000)
+  :error
+end
+
+doomed_job = fn ->
+  Process.sleep(1000)
+  raise "boom"
+end
+```
+
+```elixir
+defmodule LivebookApplication do
+  def start() do
+    job_runner_config = [
+      strategy: :one_for_one,
+      max_seconds: 30,
+      name: Jobber.JobRunner
+    ]
+
+    children = [
+      {DynamicSupervisor, job_runner_config}
+    ]
+
+    opts = [strategy: :one_for_one, name: Jobber.Supervisor]
+
+    case Supervisor.start_link(children, opts) do
+      {:ok, pid} ->
+        {:ok, pid}
+
+      {:error, {:already_started, pid}} ->
+        Supervisor.stop(pid)
+        LivebookApplication.start()
+    end
+  end
+end
+
+LivebookApplication.start()
+```
+
+```elixir
+job_runner_pid = Process.whereis(Jobber.JobRunner) |> IO.inspect()
+
+Jobber.start_job(work: doomed_job)
+```
+
+After errors have stopped because the JobSupervisor stopped restarting the crashing job…
+
+We can see `Jobber.JobRunner` is continuing to run with its same PID
+
+```elixir
+case Process.whereis(Jobber.JobRunner) do
+  ^job_runner_pid -> "stable JobRunner with pid #{inspect(job_runner_pid)}"
+  new_pid -> "unstable JobRunner: new pid #{inspect(new_pid)}"
+end
+```
+
+## Supervisor strategies
+
+Supervisor strategies determine how to manage child processes that fail.
+
+* `:one_for_one` will restart each child process independently when it fails
+* `:one_for_all` will restart all child processes if any fail
+* `:rest_for_one` will restart the failed processes and all child processes
+  that were started after the failed process
+
+## Limiting work
+
+With the work done so far we have a pretty good job running system. But one thing it lacks is
+the ability to restrict the number of jobs running concurrently.
+
+We can do this by naming processes.
