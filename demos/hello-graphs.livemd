@@ -13,9 +13,11 @@ import :digraph
 g = new()
 ```
 
-```output
-{:digraph, #Reference<0.3377866312.2421555203.17348>, #Reference<0.3377866312.2421555203.17349>,
- #Reference<0.3377866312.2421555203.17350>, true}
+<!-- livebook:{"output":true} -->
+
+```
+{:digraph, #Reference<0.3408846562.3204841473.143235>, #Reference<0.3408846562.3204841473.143236>,
+ #Reference<0.3408846562.3204841473.143237>, true}
 ```
 
 ```elixir
@@ -24,7 +26,9 @@ v2 = add_vertex(g, "World")
 get_path(g, v1, v2)
 ```
 
-```output
+<!-- livebook:{"output":true} -->
+
+```
 false
 ```
 
@@ -33,6 +37,8 @@ add_edge(g, v1, v2)
 get_path(g, v1, v2)
 ```
 
-```output
+<!-- livebook:{"output":true} -->
+
+```
 ["Hello", "World"]
 ```
