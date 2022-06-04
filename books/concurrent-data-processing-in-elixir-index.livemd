@@ -1,0 +1,9 @@
+# Concurrent Data Processing in Elixir
+
+## Intro
+
+[Concurrent Data Processing in Elixir](https://pragprog.com/titles/sgdpelixir/concurrent-data-processing-in-elixir/)
+
+[![Concurrent Data Processing in Elixir book cover](images/concurrent-data-processing-in-elixir.jpeg)](https://pragprog.com/titles/sgdpelixir/concurrent-data-processing-in-elixir/)
+
+High level notes and code examples.
