@@ -2,13 +2,15 @@
 
 # Advent of Code 2021 - Day 4
 
-## Setup
-
 ```elixir
 Mix.install([
-  {:kino, "~> 0.4.1"}
+  {:kino, "~> 0.6.1"}
 ])
 ```
+
+## Instructions
+
+### https://adventofcode.com/2021/day/4
 
 ## Sample Input
 
@@ -216,7 +218,7 @@ numbers
   if board = Enum.find(boards, &BingoBoard.won?/1) do
     {:halt, {number, BingoBoard.unmarked_sum(board)}}
   else
-    {:cont, ea(boards)}
+    {:cont, boards}
   end
 end)
 |> Tuple.product()
@@ -242,6 +244,8 @@ end)
 ```
 
 ## Actual Puzzle Input
+
+Paste [your own input from Advent of Code](https://adventofcode.com/2021/day/4/input) or copy from [sdball 2021 Advent of Code Day 4 input](https://raw.githubusercontent.com/sdball/livebooks/main/advent-of-code/2021/day04_input.txt)
 
 ```elixir
 actual_input = Kino.Input.textarea("Please paste your Day 4 puzzle input:")

@@ -14,7 +14,7 @@ Mix.install([
 
 ## Get input
 
-Paste the test input from the Day 3 instructions, [your own input from Advent of Code](https://adventofcode.com/2021/day/3/input), or copy from [sdball 2021 Advent of Code Day 3 input](https://raw.githubusercontent.com/sdball/livebooks/main/advent-of-code/2021/day3_input.txt)
+Paste the test input from the Day 3 instructions, [your own input from Advent of Code](https://adventofcode.com/2021/day/3/input), or copy from [sdball 2021 Advent of Code Day 3 input](https://raw.githubusercontent.com/sdball/livebooks/main/advent-of-code/2021/day03_input.txt)
 
 ```elixir
 input = Kino.Input.textarea("Please paste your input:")
