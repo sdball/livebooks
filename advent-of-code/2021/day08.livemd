@@ -2,21 +2,36 @@
 
 # Advent of Code 2021 - Day 8
 
-## Setup
-
 ```elixir
 Mix.install([
-  {:kino, "~> 0.4.1"}
+  {:kino, "~> 0.6.1"}
 ])
 ```
 
-## Input
+## Instructions
+
+### https://adventofcode.com/2021/day/8
+
+## Test Input
 
 ```elixir
 test_input = """
-acedgfb cdfbe gcdfa fbcad dab cefabd cdfgeb eafb cagedb ab | cdfeb fcadb cdfeb cdbaf
+be cfbegad cbdgef fgaecd cgeb fdcge agebfd fecdb fabcd edb | fdgacbe cefdb cefbgd gcbe
+edbfga begcd cbg gc gcadebf fbgde acbgfd abcde gfcbed gfec | fcgedb cgb dgebacf gc
+fgaebd cg bdaec gdafb agbcfd gdcbef bgcad gfac gcb cdgabef | cg cg fdcagb cbg
+fbegcd cbd adcefb dageb afcb bc aefdc ecdab fgdeca fcdbega | efabcd cedba gadfec cb
+aecbfdg fbg gf bafeg dbefa fcge gcbea fcaegb dgceab fcbdga | gecf egdcabf bgf bfgea
+fgeab ca afcebg bdacfeg cfaedg gcfdb baec bfadeg bafgc acf | gebdcfa ecba ca fadegcb
+dbcfg fgd bdegcaf fgec aegbdf ecdfab fbedc dacgb gdcebf gf | cefg dcbef fcge gbcadfe
+bdfegc cbegaf gecbf dfcage bdacg ed bedf ced adcbefg gebcd | ed bcgafe cdgba cbgef
+egadfb cdbfeg cegd fecab cgb gbdefca cg fgcdab egfdb bfceg | gbdfcae bgc cg cgb
+gcafb gcf dcaebfg ecagb gf abcdeg gaef cafbge fdbac fegbdc | fgae cfgab fg bagce
 """
 ```
+
+## Puzzle Input
+
+Paste [your own input from Advent of Code](https://adventofcode.com/2021/day/8/input) or copy from [sdball 2021 Advent of Code Day 8 input](https://raw.githubusercontent.com/sdball/livebooks/main/advent-of-code/2021/day08_input.txt)
 
 ```elixir
 puzzle_input = Kino.Input.textarea("Please paste your puzzle input for Day 8:")
@@ -32,17 +47,17 @@ puzzle_input =
 ## Part 1 - Test Input
 
 ```elixir
-[digits, readout] = test_input |> String.split([" | ", "\n"], trim: true)
-```
-
-```elixir
-readout
-|> String.split(" ")
-|> Enum.map(&String.to_charlist/1)
-|> Enum.filter(fn reading ->
-  length(reading) in [2, 3, 4, 7]
+test_input
+|> String.split("\n", trim: true)
+|> Enum.map(fn line ->
+  String.split(line, " | ")
+  |> Enum.at(1)
+  |> String.split()
+  |> Enum.map(&String.to_charlist/1)
+  |> Enum.filter(fn readout -> length(readout) in [2, 3, 4, 7] end)
+  |> Enum.count()
 end)
-|> Enum.count()
+|> Enum.sum()
 ```
 
 ## Part 1 - Puzzle Input
@@ -78,7 +93,14 @@ typical = %{
 ```
 
 ```elixir
-digits
+test_input =
+  "acedgfb cdfbe gcdfa fbcad dab cefabd cdfgeb eafb cagedb ab | cdfeb fcadb cdfeb cdbaf"
+```
+
+```elixir
+[digits, readout] = test_input |> String.split([" | ", "\n"], trim: true)
+IO.inspect(digits, label: :digits)
+IO.inspect(readout, label: :readout)
 ```
 
 ```elixir
