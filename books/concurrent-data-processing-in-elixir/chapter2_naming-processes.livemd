@@ -1,3 +1,5 @@
+<!-- vim: set syntax=markdown: -->
+
 # Chapter 2 - Naming processes using the registry
 
 ## Naming processes using the registry
