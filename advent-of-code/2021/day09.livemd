@@ -2,20 +2,21 @@
 
 # Advent of Code 2021 - Day 9
 
-## Setup
-
 ```elixir
 Mix.install([
-  {:kino, "~> 0.4.1"},
-  {:vega_lite, "~> 0.1.1"}
+  {:kino, "~> 0.6.1"},
+  {:vega_lite, "~> 0.1.4"},
+  {:kino_vega_lite, "~> 0.1.1"}
 ])
-```
 
-```elixir
 alias VegaLite, as: Vl
 ```
 
-## Inputs
+## Instructions
+
+### https://adventofcode.com/2021/day/9
+
+## Test Input
 
 ```elixir
 test_input = """
@@ -32,6 +33,10 @@ test_input =
   test_input
   |> String.split("\n", trim: true)
 ```
+
+## Puzzle Input
+
+Paste [your own input from Advent of Code](https://adventofcode.com/2021/day/9/input) or copy from [sdball 2021 Advent of Code Day 9 input](https://raw.githubusercontent.com/sdball/livebooks/main/advent-of-code/2021/day09_input.txt)
 
 ```elixir
 puzzle_input = Kino.Input.textarea("Please paste your day 9 input:")
@@ -109,6 +114,10 @@ Vl.new(width: 500, height: 300)
 )
 ```
 
+Cool right? We've generated a heatmap of the ocean floor from the input data!
+
+In the data 0 is the lowest possible depth which is why I'm using a custom color scheme for the scale.
+
 ## Seafloor Mapping - Puzzle Input
 
 ```elixir
@@ -128,6 +137,8 @@ seafloor_graph =
     %{"x" => x, "y" => y, "depth" => depth}
   end)
 ```
+
+## Graphing the puzzle seafloor
 
 ```elixir
 Vl.new(width: 600, height: 600)
@@ -155,6 +166,8 @@ Vl.new(width: 600, height: 600)
   legend: true
 )
 ```
+
+Cool!
 
 ## Part 1 - Test Input
 
