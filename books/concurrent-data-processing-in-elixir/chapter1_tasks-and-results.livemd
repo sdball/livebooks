@@ -150,7 +150,7 @@ end
 Sender.notify_all(emails)
 ```
 
-## Managing Series of Tasks
+## Managing a series of tasks
 
 There is a middle way between doing actions
 from a list one at time and spawning all the

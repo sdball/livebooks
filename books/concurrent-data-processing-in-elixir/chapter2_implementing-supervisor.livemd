@@ -2,7 +2,7 @@
 
 # Chapter 2 - Implementing a Supervisor
 
-## Intro
+## Implementing a Supervisor
 
 So far we've used two types of supervisors `Task.Supervisor` and `DynamicSupervisor`.
 
