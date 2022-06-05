@@ -2,11 +2,15 @@
 
 # Advent of Code 2021 - Day 11
 
-## Setup
-
 ```elixir
-Mix.install(kino: "~> 0.4.1")
+Mix.install([
+  {:kino, "~> 0.6.1"}
+])
 ```
+
+## Instructions
+
+### https://adventofcode.com/2021/day/11
 
 ## Test Input
 
@@ -26,6 +30,8 @@ test_input = """
 ```
 
 ## Puzzle Input
+
+Paste [your own input from Advent of Code](https://adventofcode.com/2021/day/11/input) or copy from [sdball 2021 Advent of Code Day 11 input](https://raw.githubusercontent.com/sdball/livebooks/main/advent-of-code/2021/day11_input.txt)
 
 ```elixir
 puzzle_input = Kino.Input.textarea("Please paste your Day 11 puzzle input:")
