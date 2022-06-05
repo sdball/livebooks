@@ -2,19 +2,22 @@
 
 # Advent of Code 2021 - Day 7
 
-## Setup
-
 ```elixir
 Mix.install([
-  {:kino, "~> 0.4.1"},
-  {:math, "~> 0.6.0"},
-  {:vega_lite, "~> 0.1.0"}
+  {:kino, "~> 0.6.1"},
+  {:vega_lite, "~> 0.1.4"},
+  {:kino_vega_lite, "~> 0.1.1"},
+  {:math, "~> 0.7.0"}
 ])
 
 alias VegaLite, as: Vl
 ```
 
-## Inputs
+## Instructions
+
+### https://adventofcode.com/2021/day/7
+
+## Test Input
 
 ```elixir
 test_input = "16,1,2,0,4,2,7,1,2,14"
@@ -26,6 +29,10 @@ test_input =
   |> String.split(",")
   |> Enum.map(&String.to_integer/1)
 ```
+
+## Puzzle Input
+
+Paste [your own input from Advent of Code](https://adventofcode.com/2021/day/7/input) or copy from [sdball 2021 Advent of Code Day 7 input](https://raw.githubusercontent.com/sdball/livebooks/main/advent-of-code/2021/day07_input.txt)
 
 ```elixir
 puzzle_input = Kino.Input.textarea("Please paste your input for Day 7:")
