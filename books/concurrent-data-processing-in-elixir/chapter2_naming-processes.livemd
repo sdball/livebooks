@@ -1,0 +1,278 @@
+# Chapter 2 - Naming processes using the registry
+
+## Naming processes using the registry
+
+We can optionally provide a name when starting a process that can be used instead of a pid.
+
+Elixir comes with a `Registry` module.
+
+Three types
+
+* atom names
+* `{:global, term}` tuple
+* `{:via, module, term}`
+
+```elixir
+defmodule Jobber.Job do
+  defstruct [:work, :id, :max_retries, retries: 0, status: "new"]
+  use GenServer, restart: :transient
+  require Logger
+
+  def init(args) do
+    work = Keyword.fetch!(args, :work)
+    id = Keyword.get(args, :id)
+    max_retries = Keyword.get(args, :max_retries, 3)
+
+    state = %Jobber.Job{id: id, work: work, max_retries: max_retries}
+    {:ok, state, {:continue, :run}}
+  end
+
+  def handle_continue(:run, state) do
+    new_state =
+      state.work.()
+      |> handle_job_result(state)
+
+    if new_state.status == "errored" do
+      Process.send_after(self(), :retry, 5000)
+      {:noreply, new_state}
+    else
+      Logger.info("Job exiting #{state.id}")
+      {:stop, :normal, new_state}
+    end
+  end
+
+  def handle_info(:retry, state) do
+    {:noreply, state, {:continue, :run}}
+  end
+
+  def start_link(args) do
+    args =
+      if Keyword.has_key?(args, :id) do
+        args
+      else
+        Keyword.put(args, :id, random_job_id())
+      end
+
+    id = Keyword.get(args, :id)
+    type = Keyword.get(args, :type)
+
+    GenServer.start_link(__MODULE__, args, name: via(id, type))
+  end
+
+  defp random_job_id() do
+    :crypto.strong_rand_bytes(5)
+    |> Base.url_encode64(padding: false)
+  end
+
+  defp handle_job_result({:ok, _data}, state) do
+    Logger.info("Job completed #{state.id}")
+    %Jobber.Job{state | status: "done"}
+  end
+
+  defp handle_job_result(:error, %{status: "new"} = state) do
+    Logger.warn("Job errored #{state.id}")
+    %Jobber.Job{state | status: "errored"}
+  end
+
+  defp handle_job_result(:error, %{status: "errored"} = state) do
+    Logger.warn("Job retry failed #{state.id}")
+    new_state = %Jobber.Job{state | retries: state.retries + 1}
+
+    if new_state.retries == state.max_retries do
+      %Jobber.Job{new_state | status: "failed"}
+    else
+      new_state
+    end
+  end
+
+  defp via(key, value) do
+    {:via, Registry, {Jobber.JobRegistry, key, value}}
+  end
+end
+```
+
+```elixir
+defmodule Jobber.JobSupervisor do
+  use Supervisor, restart: :temporary
+
+  def start_link(args) do
+    Supervisor.start_link(__MODULE__, args)
+  end
+
+  def init(args) do
+    children = [
+      {Jobber.Job, args}
+    ]
+
+    options = [
+      strategy: :one_for_one,
+      max_seconds: 30
+    ]
+
+    Supervisor.init(children, options)
+  end
+end
+```
+
+```elixir
+defmodule Jobber do
+  alias Jobber.{JobRunner, JobSupervisor}
+
+  def start_job(args) do
+    IO.inspect("Jobber starting job #{inspect(args)}")
+    DynamicSupervisor.start_child(JobRunner, {JobSupervisor, args})
+  end
+
+  def running_imports() do
+    match_all = {:"$1", :"$2", :"$3"}
+    guards = [{:==, :"$3", "import"}]
+    # map_result = [{{:"$1", :"$2", :"$3"}}]
+    map_result = [%{id: :"$1", pid: :"$2", type: :"$3"}]
+
+    Registry.select(Jobber.JobRegistry, [
+      {
+        match_all,
+        guards,
+        map_result
+      }
+    ])
+  end
+end
+```
+
+```elixir
+defmodule LivebookApplication do
+  def start() do
+    job_runner_config = [
+      strategy: :one_for_one,
+      max_seconds: 30,
+      name: Jobber.JobRunner
+    ]
+
+    children = [
+      {Registry, keys: :unique, name: Jobber.JobRegistry},
+      {DynamicSupervisor, job_runner_config}
+    ]
+
+    opts = [strategy: :one_for_one, name: Jobber.Supervisor]
+
+    case Supervisor.start_link(children, opts) do
+      {:ok, pid} ->
+        {:ok, pid}
+
+      {:error, {:already_started, pid}} ->
+        Supervisor.stop(pid)
+        LivebookApplication.start()
+    end
+  end
+end
+
+LivebookApplication.start()
+```
+
+```elixir
+good_job = fn ->
+  Process.sleep(1000)
+  {:ok, []}
+end
+```
+
+```elixir
+Jobber.start_job(work: good_job, type: "import")
+Jobber.start_job(work: good_job, type: "send_email")
+Jobber.start_job(work: good_job, type: "import")
+
+# should print out all running import jobs
+Jobber.running_imports()
+```
+
+Each value in the registry is `{name, pid, value}`
+
+With this registration in place we can find import jobs and limit their concurrency.
+
+## Limiting concurrency of import jobs using the registry
+
+```elixir
+defmodule Jobber do
+  alias Jobber.{JobRunner, JobSupervisor}
+
+  def start_job(args) do
+    if Enum.count(running_imports()) >= 5 do
+      {:error, :import_quota_reached}
+    else
+      IO.inspect("Jobber starting job #{inspect(args)}")
+      DynamicSupervisor.start_child(JobRunner, {JobSupervisor, args})
+    end
+  end
+
+  def running_imports() do
+    match_all = {:"$1", :"$2", :"$3"}
+    guards = [{:==, :"$3", "import"}]
+    # map_result = [{{:"$1", :"$2", :"$3"}}]
+    map_result = [%{id: :"$1", pid: :"$2", type: :"$3"}]
+
+    Registry.select(Jobber.JobRegistry, [
+      {
+        match_all,
+        guards,
+        map_result
+      }
+    ])
+  end
+end
+```
+
+```elixir
+Jobber.start_job(work: good_job, type: "import") |> IO.inspect()
+Jobber.start_job(work: good_job, type: "import") |> IO.inspect()
+Jobber.start_job(work: good_job, type: "import") |> IO.inspect()
+Jobber.start_job(work: good_job, type: "import") |> IO.inspect()
+Jobber.start_job(work: good_job, type: "import") |> IO.inspect()
+
+# {:error, :import_quota_reached}
+Jobber.start_job(work: good_job, type: "import") |> IO.inspect()
+```
+
+## Inspecting supervisors at runtime
+
+```elixir
+DynamicSupervisor.count_children(Jobber.JobRunner)
+```
+
+```elixir
+DynamicSupervisor.which_children(Jobber.JobRunner)
+```
+
+```elixir
+Jobber.start_job(work: good_job, type: "import") |> IO.inspect()
+Jobber.start_job(work: good_job, type: "import") |> IO.inspect()
+Jobber.start_job(work: good_job, type: "import") |> IO.inspect()
+Jobber.start_job(work: good_job, type: "import") |> IO.inspect()
+Jobber.start_job(work: good_job, type: "send_email") |> IO.inspect()
+
+DynamicSupervisor.which_children(Jobber.JobRunner)
+|> Enum.map(fn {_, pid, _type, _modules} ->
+  case Supervisor.count_children(pid) do
+    info = %{active: 0} ->
+      Supervisor.stop(pid)
+      {pid, info}
+
+    info ->
+      {pid, info}
+  end
+end)
+```
+
+```elixir
+DynamicSupervisor.which_children(Jobber.JobRunner)
+|> Enum.map(fn {_, pid, _type, _modules} ->
+  case Supervisor.count_children(pid) do
+    info = %{active: 0} ->
+      Supervisor.stop(pid)
+      {:stopped, pid, info}
+
+    info ->
+      {pid, info}
+  end
+end)
+```

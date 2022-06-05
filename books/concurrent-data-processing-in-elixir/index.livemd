@@ -1,4 +1,4 @@
-# Concurrent Data Processing in Elixir
+# Concurrent Data Processing in Elixir - Index
 
 ## Intro
 
@@ -18,3 +18,4 @@ High level notes and code examples.
 * [Building a job processing system out of GenServers](chapter2_job-processing.livemd)
 * [Introducing DynamicSupervisor](chapter2_dynamic-supervisor.livemd)
 * [Implementing a supervisor](chapter2_implementing-supervisor.livemd)
+* [Naming processes using the registry](chapter2_naming-processes.livemd)
