@@ -12,10 +12,10 @@ Mix.install([
 
 ### https://adventofcode.com/2021/day/4
 
-## Sample Input
+## Test Input
 
 ```elixir
-sample_input = """
+test_input = """
 7,4,9,5,11,17,23,2,0,14,21,24,10,16,13,6,15,25,12,22,18,20,8,19,3,26,1
 
 22 13 17 11  0
@@ -38,11 +38,11 @@ sample_input = """
 """
 ```
 
-## Part 1 - Spike with sample data
+## Part 1 - Spike with test data
 
 ```elixir
 [numbers | boards] =
-  sample_input
+  test_input
   |> String.split("\n\n")
 
 numbers =
@@ -135,11 +135,11 @@ defmodule BingoBoard do
 end
 ```
 
-## Sample Input into BingoBoard structs
+## Test Input into BingoBoard structs
 
 ```elixir
 [numbers | boards] =
-  sample_input
+  test_input
   |> String.split("\n\n")
 
 numbers =
@@ -226,7 +226,7 @@ end)
 |> BingoBoard.unmarked_sum()
 ```
 
-## Part 1 with Sample Input
+## Part 1 with Test Input
 
 ```elixir
 numbers
@@ -242,7 +242,7 @@ end)
 |> Tuple.product()
 ```
 
-## Part 2 with Sample Input
+## Part 2 with Test Input
 
 ```elixir
 numbers

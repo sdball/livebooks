@@ -2,13 +2,15 @@
 
 # Advent of Code 2021 - Day 5
 
-## Setup
-
 ```elixir
 Mix.install([
-  {:kino, "~> 0.4.1"}
+  {:kino, "~> 0.6.1"}
 ])
 ```
+
+## Instructions
+
+### https://adventofcode.com/2021/day/5
 
 ## Test Input
 
@@ -29,9 +31,13 @@ test_input = """
 
 ## Puzzle Input
 
+Paste [your own input from Advent of Code](https://adventofcode.com/2021/day/5/input) or copy from [sdball 2021 Advent of Code Day 5 input](https://raw.githubusercontent.com/sdball/livebooks/main/advent-of-code/2021/day05_input.txt)
+
 ```elixir
-puzzle_input = Kino.Input.textarea("Please paste your Day 5 puzzle input here:")
+puzzle_input = Kino.Input.textarea("Please paste your Day 5 puzzle input:")
 ```
+
+<!-- livebook:{"reevaluate_automatically":true} -->
 
 ```elixir
 puzzle_input = puzzle_input |> Kino.Input.read()
