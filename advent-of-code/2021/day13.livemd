@@ -2,15 +2,18 @@
 
 # Advent of Code 2021 - Day 13
 
-## Setup
-
 ```elixir
 Mix.install([
-  {:kino, "~> 0.4.1"}
+  {:kino, "~> 0.6.1"},
+  {:kino_vega_lite, "~> 0.1.1"}
 ])
 ```
 
-## Inputs
+## Instructions
+
+### https://adventofcode.com/2021/day/13
+
+## Test Input
 
 ```elixir
 test_input = """
@@ -37,6 +40,10 @@ fold along y=7
 fold along x=5
 """
 ```
+
+## Puzzle Input
+
+Paste [your own input from Advent of Code](https://adventofcode.com/2021/day/13/input) or copy from [sdball 2021 Advent of Code Day 13 input](https://raw.githubusercontent.com/sdball/livebooks/main/advent-of-code/2021/day13_input.txt)
 
 ```elixir
 puzzle_input = Kino.Input.textarea("Please paste your puzzle input:")
@@ -131,6 +138,8 @@ defmodule Paper do
 
       IO.puts("")
     end
+
+    paper
   end
 end
 ```
@@ -193,4 +202,6 @@ folds
   Paper.fold(paper, fold)
 end)
 |> Paper.inspect()
+
+nil
 ```
