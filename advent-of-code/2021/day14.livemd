@@ -2,15 +2,17 @@
 
 # Advent of Code 2021 - Day 14
 
-## Section
-
 ```elixir
 Mix.install([
-  {:kino, "~> 0.4.1"}
+  {:kino, "~> 0.6.1"}
 ])
 ```
 
-## Inputs
+## Instructions
+
+### https://adventofcode.com/2021/day/14
+
+## Test Input
 
 ```elixir
 test_input = """
@@ -34,6 +36,10 @@ CC -> N
 CN -> C
 """
 ```
+
+## Puzzle Input
+
+Paste [your own input from Advent of Code](https://adventofcode.com/2021/day/14/input) or copy from [sdball 2021 Advent of Code Day 14 input](https://raw.githubusercontent.com/sdball/livebooks/main/advent-of-code/2021/day14_input.txt)
 
 ```elixir
 puzzle_input = Kino.Input.textarea("Please paste your puzzle input:")
@@ -141,6 +147,7 @@ result == "NBBNBNBBCCNBCNCCNBBNBBNBBBNBBNBBCBHCBHHNHCBBCBHCB"
 
 result =
   template
+  # apply ten iterations of the rules
   |> ProcessTemplate.process(rules)
   |> ProcessTemplate.process(rules)
   |> ProcessTemplate.process(rules)
@@ -170,6 +177,7 @@ result =
 
 result =
   template
+  # apply ten iterations of the rules
   |> ProcessTemplate.process(rules)
   |> ProcessTemplate.process(rules)
   |> ProcessTemplate.process(rules)
@@ -256,6 +264,9 @@ result =
     left
   end)
   |> Enum.frequencies()
+  |> Enum.map(fn {char, count} ->
+    {[char], count}
+  end)
 ```
 
 It works! From the puzzle specification
@@ -358,6 +369,9 @@ end)
 end)
 |> List.flatten()
 |> Enum.frequencies()
+|> Enum.map(fn {char, count} ->
+  {[char], count}
+end)
 ```
 
 ## Counting Pairs
@@ -531,3 +545,7 @@ end)
   max - min
 end)
 ```
+
+So many digits in 5ms.
+
+4,302,675,529,689 is **trillions**
