@@ -15,7 +15,7 @@
 * [Day 9](day09.livemd) - the one where we graph the seafloor
 * [Day 10](day10.livemd) - the one where we write a parser
 * [Day 11](day11.livemd)
-* [Day 12](day12.livemd)
-* [Day 13](day13.livemd)
+* [Day 12](day12.livemd) - the one where we build a graph
+* [Day 13](day13.livemd) - the one where we fold paper
 * [Day 14](day14.livemd)
 * [Day 15](day15.livemd)
