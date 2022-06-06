@@ -2,18 +2,20 @@
 
 # Advent of Code 2021 - Day 12
 
-## Setup
-
 ```elixir
 Mix.install([
-  {:libgraph, "~> 0.13.3"},
-  {:kino, "~> 0.4.1"}
+  {:kino, "~> 0.6.1"},
+  {:libgraph, "~> 0.13.3"}
 ])
 
 alias :digraph, as: Digraph
 ```
 
-## Inputs
+## Instructions
+
+### https://adventofcode.com/2021/day/12
+
+## Test Input
 
 ```elixir
 test_input1 = """
@@ -64,6 +66,10 @@ pj-fs
 start-RW
 """
 ```
+
+## Puzzle Input
+
+Paste [your own input from Advent of Code](https://adventofcode.com/2021/day/12/input) or copy from [sdball 2021 Advent of Code Day 12 input](https://raw.githubusercontent.com/sdball/livebooks/main/advent-of-code/2021/day12_input.txt)
 
 ```elixir
 puzzle_text = Kino.Input.textarea("Please paste your puzzle input:")
