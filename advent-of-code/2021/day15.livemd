@@ -2,16 +2,14 @@
 
 # Advent of Code 2021 - Day 15
 
-## Setup
-
 ```elixir
 Mix.install([
-  {:kino, "~> 0.4.1"},
+  {:kino, "~> 0.6.1"},
   {:libgraph, git: "https://github.com/bitwalker/libgraph", branch: "main"}
 ])
 ```
 
-## Inputs
+## Test Input
 
 ```elixir
 test_input = """
@@ -27,6 +25,10 @@ test_input = """
 2311944581
 """
 ```
+
+## Puzzle Input
+
+Paste [your own input from Advent of Code](https://adventofcode.com/2021/day/15/input) or copy from [sdball 2021 Advent of Code Day 15 input](https://raw.githubusercontent.com/sdball/livebooks/main/advent-of-code/2021/day15_input.txt)
 
 ```elixir
 puzzle_input = Kino.Input.textarea("Please paste your puzzle input:")
@@ -129,11 +131,6 @@ end)
 ```
 
 ## Part 2 - Generate Bigger Map
-
-```elixir
-danger_map = Input.to_map(test_input) |> GenerateBiggerMap.generate()
-{{start, _}, {final, _}} = Enum.min_max(danger_map)
-```
 
 ```elixir
 sample = """
