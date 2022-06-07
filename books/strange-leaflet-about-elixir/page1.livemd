@@ -48,7 +48,7 @@ There's a peace to that. A satisfaction. There is where I am and this is where I
 
 > …In the land of motherboard, in the fires of Mount CPU, the Dark Lord Transitor forged in secret a master Ring, to control all others. And into this Ring he poured his cruelty, his malice and his will to dominate all life. One Ring to rule them all.
 
-![](images/dark-lord-sauron.jpeg)
+![](https://raw.githubusercontent.com/sdball/livebooks/main/books/strange-leaflet-about-elixir/images/dark-lord-sauron.jpeg)
 
 <!-- livebook:{"break_markdown":true} -->
 
@@ -88,7 +88,7 @@ self()
 
 We have a PID. Right now! A process ID. In this very Livebook. It's listening to everything we say.
 
-![](images/princess.png)
+![](https://raw.githubusercontent.com/sdball/livebooks/main/books/strange-leaflet-about-elixir/images/princess.png)
 
 Just as that pid is sharing all your adventures here, others are sharing its. They were with our pid when it evaluated the zero. They were with our pid when it divided by the zero and failed to print Bilbo's words. They're even with our pid as it prints its own story, right now.
 
