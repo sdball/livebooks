@@ -1,0 +1,97 @@
+<!-- vim: set syntax=markdown: -->
+
+# Stephen's Not Poignant Strange Leaflet about Elixir
+
+## > read leaflet
+
+(Taken)
+
+> WELCOME TO ELIXIR!
+>
+> ELIXIR is a language of adventure, danger, and low cunning. In it you will explore some of the most amazing territory ever seen by mortals. No computer should be without one!
+
+## > drop it
+
+Dropped.
+
+## > look
+
+I'll be honest with you reader. There isn't anything to see here expect what you already see. There is no state filled game world to explore. That leaflet you just read isn't real. There is no player-character that once held a leaflet, read it, and then dropped it.
+
+The leaflet is this right here. What you're reading now.
+
+But that doesn't mean we can't do things! I mean, it doesn't have to.
+
+Let's me show you what I mean.
+
+```elixir
+0
+```
+
+There you see? You just made an Elixir runtime evaluate some code!
+
+This is not code right here. Only text. But the contents are the same.
+
+<!-- livebook:{"force_markdown":true} -->
+
+```elixir
+0
+```
+
+Unlike the code before that little snippet of text is only Elixir-highlighted code. It's not real. It's only text. That is, it's only data. But it's not evaluated data. It's just a `0` printed on your screen. That's all it will ever do: be a `0`. We can't add to it, ask it if it is in fact a `0`, or crash an Elixir process by dividing by it. It simply is.
+
+There's a peace to that. A satisfaction. There is where I am and this is where I'll be, it says. That first zero we saw in the actual evalating code block was much more involved with itself. It wasn't simply text, it was CODE. A value passing through lines of code down through many layers of abstraction to hit the transitors on your fancy CPU cores and then back up again.
+
+> …In the land of motherboard, in the fires of Mount CPU, the Dark Lord Transitor forged in secret a master Ring, to control all others. And into this Ring he poured his cruelty, his malice and his will to dominate all life. One Ring to rule them all.
+
+![](images/dark-lord-sauron.jpeg)
+
+<!-- livebook:{"break_markdown":true} -->
+
+Or not it's only a zero.
+
+But a zero has its power!
+
+```elixir
+1 / 0
+
+IO.puts("I'm old Frodo")
+```
+
+That division by zero just killed an Elixir process right in its tracks. It'll never reach that puts statement. No chance.
+
+But let's hold on a second.
+
+What is Elixir?
+
+Well I hope you're curious to hear my answer to that question because that's all I'm offering here.
+
+I think if you've never really met Elixir you may be thinking of it as programming language. And that's true, from a certain point of view. But it's missing the actual story.
+
+That's like "What is Earth?" "A rocky planet orbiting the sun"
+
+Yes that's *TRUE* but there's a lot of context you just… you just skipped over.
+
+Elixir is MORE like an operating system with running processes, cpu, memory, and a /bin full of tools ready for you to use.
+
+You can start off simple and learn some basic syntax of Elixir and kind of lump it in with every other language out there but you're missing it. You're simply missing it!
+
+Let me show you something.
+
+```elixir
+self()
+```
+
+We have a PID. Right now! A process ID. In this very Livebook. It's listening to everything we say.
+
+![](images/princess.png)
+
+Just as that pid is sharing all your adventures here, others are sharing its. They were with our pid when it evaluated the zero. They were with our pid when it divided by the zero and failed to print Bilbo's words. They're even with our pid as it prints its own story, right now.
+
+```elixir
+Process.info(self())
+```
+
+You see, Elixir is a language where you are never alone. Your code is never running by itself with no friends and no allies. Your code has access to a universal force. An energy field that surrounds, penetrates, and binds our code together. It has BEAM.
+
+[turn the page](page2.livemd)
