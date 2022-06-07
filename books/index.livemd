@@ -18,4 +18,4 @@ You can't see any kind of books here!
 
 ## Clickable
 
-* [Stephen's Not Poignant Strange Leaflet about Elixir](strange-leaflet-about-elixir/page1.livemd)
+* [Stephen's Strange Leaflet about Elixir](strange-leaflet-about-elixir/page1.livemd)

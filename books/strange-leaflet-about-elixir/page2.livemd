@@ -1,0 +1,114 @@
+<!-- vim: set syntax=markdown: -->
+
+# Stephen's Strange Leaflet about Elixir - Page 2
+
+```elixir
+Mix.install([
+  {:kino, "~> 0.6.1"}
+])
+```
+
+## If you don't have this open in Livebook you should
+
+<!-- vim: set syntax=markdown: -->
+
+[![Run in Livebook](https://livebook.dev/badge/v1/blue.svg)](https://livebook.dev/run?url=https%3A%2F%2Fgithub.com%2Fsdball%2Flivebooks%2Fblob%2Fmain%2Fbooks%2Fstrange-leaflet-about-elixir%2Fpage2.livemd)
+
+## The BEAM?
+
+Well the BEAM is what gives Erlang its power.
+
+The BEAM is the Erlang VM and it is a huge part of what make Erlang (and hence Elixir) special.
+
+![](https://raw.githubusercontent.com/sdball/livebooks/main/books/strange-leaflet-about-elixir/images/io-tower.jpeg)
+
+### SIDE NOTE
+
+Erlang and Elixir are not competitors, they aren't locked in a bitter struggle to establish dominance. Both languages run on the Erlang VM (BEAM) and can call each other completely transparently.
+
+Let me show you some Erlang being called from some Elixir.
+
+```elixir
+:timer.sleep(100)
+```
+
+That sleep is the same as this Elixir code.
+
+```elixir
+Process.sleep(100)
+```
+
+`:timer` is an Erlang module. That's right to call Erlang from Elixir you just call the functions there's no magic involved except the magic of the BEAM.
+
+## So the BEAM
+
+Yes the BEAM!
+
+Let's start up an Elixir runtime and see what goes on here.
+
+First: `beam`
+
+The `beam` command starts in a single operating system process.
+
+It's important to understand that your operating system has processes but those are entirely different than Elixir processes
+
+```elixir
+{stdout, exitcode} = System.cmd("pgrep", ["-f", "beam"])
+```
+
+```elixir
+beam_operating_system_process_ids = String.split(stdout, "\n", trim: true)
+```
+
+```elixir
+beam_operating_system_process_ids
+|> Enum.map(fn os_pid ->
+  {stdout, 0} = System.cmd("ps", [os_pid, "-o", "pid=,command="])
+  stdout
+end)
+|> Enum.join("\n")
+|> Kino.Markdown.new()
+```
+
+What we can see from that output is the `beam` commands running on your system. Or at least running on the system running this Livebook.
+
+BEAM stands for Bogdan/Björn's Erlang Abstract Machine, which is the virtual machine at the core of the Erlang Open Telecom Platform (OTP).
+
+When the `beam` command runs it starts the Erlang VM. Not a VM like a VMWare Fusion or VirtualBox VM: but a VM in a sense that it is a *virtual machine* that Elixir code talks to which abstracts away the actual machine that the beam is running on.
+
+When it starts up, BEAM creates a **thread** for each CPU.
+
+Each threads runs a **scheduler** that is responsible for, well, scheduling processes (now we're talking about Elixir processes) to run.
+
+Let's stop for a second and think about that. This is the magic that allows Elixir systems to be highly scalable. Typical (well designed!) Elixir systems have thousands to millions of processes. Due to the nature of HOW BEAM WORKS FUNDAMENTALLY those processes are scheduled across ALL the CPUs available on your system.
+
+That means as an Elixir programmer you essentially get scalable performance for free. You don't have to think about how to design your threads and locks and waits: you write your processes that send messages to each other and BEAM spreads them around all the CPUs it can find.
+
+<!-- livebook:{"break_markdown":true} -->
+
+<!-- Learn more at https://mermaid-js.github.io/mermaid -->
+
+```mermaid
+graph TD;
+  BEAM --> CPU1 & CPU2 & CPU3 & ... & CPU_N;
+  CPU1 --> THREAD1;
+  CPU2 --> THREAD2;
+  CPU3 --> THREAD3;
+  ... --> ....
+  CPU_N --> THREAD_N;
+  THREAD1 --> SCHEDULER1
+  THREAD2 --> SCHEDULER2
+  THREAD3 --> SCHEDULER3
+  .... --> .....
+  THREAD_N --> SCHEDULER_N
+```
+
+<!-- livebook:{"break_markdown":true} -->
+
+What is Elixir? Elixir is `beam` running a **thread** per CPU running a **scheduler** per thread pulling Elixir processes off a queue for some time to run on the CPU.
+
+Everything in Elixir is running in a process.
+
+Elixir applications run thousands or millions of processes. Think of them as cheap as instantiating an object in an object oriented language. (Although that isn't quite right, they're much cheaper.)
+
+[turn to page 3](page3.livemd)
