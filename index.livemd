@@ -16,7 +16,7 @@ Hopefully if you're reading this you clicked the "Run in Livebook" button. That 
 
 ## Book notes
 
-* [Concurrent Data Processing in Elixir](books/concurrent-data-processing-in-elixir/index.livemd)
+* [Concurrent Data Processing in Elixir](book-notes/concurrent-data-processing-in-elixir/index.livemd)
 
 ## Advent of code
 
