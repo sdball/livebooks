@@ -90,7 +90,7 @@ We have a PID. Right now! A process ID. In this very Livebook. It's listening to
 
 ![](https://raw.githubusercontent.com/sdball/livebooks/main/books/strange-leaflet-about-elixir/images/princess.png)
 
-Just as that pid is sharing all your adventures here, others are sharing its. They were with our pid when it evaluated the zero. They were with our pid when it divided by the zero and failed to print Bilbo's words. They're even with our pid as it prints its own story, right now.
+Just as our pid is sharing all of our adventures here, other pids are sharing its. They were with our pid when it evaluated the zero. They were with our pid when it divided by the zero and failed to print Bilbo's words. They're even with our pid as it prints its own story, right now.
 
 ```elixir
 Process.info(self())
