@@ -1,13 +1,17 @@
+# Stephen's Not Poignant Strange Leaflet about Elixir
+
+## If you don't have this open in Livebook you should
+
 <!-- vim: set syntax=markdown: -->
 
-# Stephen's Not Poignant Strange Leaflet about Elixir
+[![Run in Livebook](https://livebook.dev/badge/v1/blue.svg)](https://livebook.dev/run?url=https%3A%2F%2Fgithub.com%2Fsdball%2Flivebooks%2Fblob%2Fmain%2Fbooks%2Fstrange-leaflet-about-elixir%2Fpage1.livemd)
 
 ## > read leaflet
 
 (Taken)
 
 > WELCOME TO ELIXIR!
->
+> 
 > ELIXIR is a language of adventure, danger, and low cunning. In it you will explore some of the most amazing territory ever seen by mortals. No computer should be without one!
 
 ## > drop it
