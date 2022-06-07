@@ -101,4 +101,4 @@ end)
 
 You see, Elixir is a language where your processes are never alone. Your code is never running by itself with no friends and no allies. Your code has access to a universal force. An energy field that surrounds, penetrates, and binds our code together. It has the BEAM.
 
-[turn to page 2](page2.livemd)
+[turn to page 2](page2.livemd) »
