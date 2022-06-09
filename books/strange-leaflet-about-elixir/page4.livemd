@@ -1,0 +1,190 @@
+<!-- vim: set syntax=markdown: -->
+
+# Stephen's Strange Leaflet about Elixir - Page 4
+
+```elixir
+Mix.install([
+  {:kino, "~> 0.6.1"}
+])
+```
+
+## If you don't have this open in Livebook you should
+
+[![Run in Livebook](https://livebook.dev/badge/v1/blue.svg)](https://livebook.dev/run?url=https%3A%2F%2Fgithub.com%2Fsdball%2Flivebooks%2Fblob%2Fmain%2Fbooks%2Fstrange-leaflet-about-elixir%2Fpage4.livemd)
+
+## Thinking in processes
+
+Shifting to thinking in processes is one of the biggest leaps that separates someone who knows the Elixir language syntax from someone who writes idiomatic Elixir.
+
+You can absolutely write big giant processes that do a lot of work iteratively and then complain that Elixir isn't a magic wand for concurrency at all and it's slow and annoying and you don't see what all the fuss is about. That would be very sad.
+
+But you could do it.
+
+Like how lawnmower man was trying password combinations iteratively one by one when he was trying to escape the mainframe. Dude got lucky.
+
+Or you could let go your earthly tether, empty, and become wind.
+
+## A process working from top to bottom
+
+Let's say we have a password system.
+
+If we use `my voice is my passport` then we gain access. If we use anything else then we have to wait three seconds and get an error response.
+
+```elixir
+defmodule PasswordSystem do
+  def check("my voice is my passport") do
+    {:ok, :access_granted}
+  end
+
+  def check(_password) do
+    Process.sleep(3000)
+    {:error, :access_denied}
+  end
+end
+```
+
+```elixir
+PasswordSystem.check("setec astronomy")
+```
+
+```elixir
+PasswordSystem.check("reindeer flotilla")
+```
+
+```elixir
+PasswordSystem.check("my voice is my passport")
+```
+
+Let's say we're hacking the system. If we wanted to try a list of passwords against the password system one by one then we'd have to wait three seconds per guess! For only a hundred passwords that'd be almost five minutes of waiting if we were unlucky enough to have the right password at the end of the list. If we had the right password in the list at all.
+
+```elixir
+cracked_password =
+  1..3
+  |> Enum.into([])
+  |> then(fn list ->
+    list ++ ["my voice is my passport"] ++ [5, 6, 7]
+  end)
+  |> IO.inspect(label: "password guesses")
+  |> Enum.find(fn guess ->
+    {:ok, :access_granted} == PasswordSystem.check(guess)
+  end)
+
+if !is_nil(cracked_password) do
+  IO.puts("We're in 😎 the password is: #{inspect(cracked_password)}")
+end
+```
+
+No. We're serious hackers with sunglasses and a powerglove. That kind of waiting won't do at all!
+
+We won't limit ourselves to one guess at a time. We'll guess them all at once because this password system doesn't have any rate limits.
+
+## Tasks
+
+One of the simplest ways to spawn a new process is the top level `spawn/1` function or `Process.spawn/2`.
+
+They spawn a process with the given function and then the function completes the processes die.
+
+```elixir
+pid = spawn(fn -> 3 + 1 end)
+
+Process.alive?(pid)
+|> IO.inspect(label: "process alive immediately after spawn?")
+
+Process.sleep(100)
+
+Process.alive?(pid)
+|> IO.inspect(label: "process alive after 100ms?")
+```
+
+You'll likely note that there's no way to get at the function result of that spawned process. We can't dig into the memory or state of that process from the outside. And we can't send it a message to ask for the result because 1) it's dead already and 2) we never taught it how to respond to messages anyway.
+
+To get a result back the Elixir approach of thinking in processes is: send a message!
+
+```elixir
+# note who we are
+origin = self()
+
+# spawn off the work, note the closure allowing the anonymous function to have `origin`
+spawn(fn -> send(origin, {:response, 4 + 1}) end)
+
+# receive the answer, waiting up to 100ms
+receive do
+  {:response, answer} -> IO.puts("We got an answer! #{answer}")
+after
+  100 ->
+    IO.puts("no messages after 100ms")
+end
+```
+
+As you may be starting to suspect, `spawn/1` is a simple function to kick off another process at a pretty low level of abstraction. We have higher levels of abstraction available and unless things are real weird we should use them instead.
+
+## The Task module
+
+Elixir provides the `Task` module to be a nice abstraction around sending off units of work for which we may or may not want a result.
+
+Let's use `Task` to crack our password!
+
+First, here's how to queue a task and get its result. No need for us high level programmers to think about the coordination of sending/receiving messages!
+
+```elixir
+task = Task.async(fn -> 1 + 3 end)
+Task.await(task)
+```
+
+Let's spawn off an async Task per password guess and get this hack going!
+
+```elixir
+1..1000
+|> Enum.into([])
+|> then(fn list ->
+  list ++ ["my voice is my passport"]
+end)
+|> then(fn guesses ->
+  IO.inspect(Enum.count(guesses), label: "password guesses count")
+  guesses
+end)
+|> Enum.map(fn guess ->
+  Task.async(fn ->
+    case PasswordSystem.check(guess) do
+      {:ok, :access_granted} ->
+        {:ok, guess}
+
+      _ ->
+        {:error, guess}
+    end
+  end)
+end)
+|> Task.await_many()
+|> Enum.find(fn result ->
+  case result do
+    {:ok, _password} -> true
+    _ -> false
+  end
+end)
+|> then(fn result ->
+  case result do
+    {:ok, password} ->
+      IO.puts("We're in 😎 the password is: #{inspect(password)}")
+
+    nil ->
+      IO.puts("Our hack failed noooooo!")
+  end
+end)
+```
+
+What did we just do there?!
+
+Well
+
+1. We mapped 1000 numbers into a list of guesses
+2. Appended the actual password to the end (our worst case scenario for iteration)
+3. Mapped each of those to `Task.async/1`
+4. Handed that resulting list to `Task.await_many/1` which knows how to wait for a list of tasks
+5. Checked through our list of results to find out if any of the guesses was the right password.
+6. Print out a success or failure
+
+This is the slightest dip into the world of Elixir processes. But it's a start!
+
+<!-- livebook:{"break_markdown":true} -->
+
+« [back to page 3](page3.livemd) || [turn to page 5](page5.livemd) »
