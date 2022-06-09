@@ -10,8 +10,6 @@ Mix.install([
 
 ## If you don't have this open in Livebook you should
 
-<!-- vim: set syntax=markdown: -->
-
 [![Run in Livebook](https://livebook.dev/badge/v1/blue.svg)](https://livebook.dev/run?url=https%3A%2F%2Fgithub.com%2Fsdball%2Flivebooks%2Fblob%2Fmain%2Fbooks%2Fstrange-leaflet-about-elixir%2Fpage3.livemd)
 
 ## I've been wondering, what are Elixir processes?
