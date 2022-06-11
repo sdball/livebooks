@@ -1,0 +1,37 @@
+# Chapter 3 - Introducing GenStage
+
+## Intro
+
+**GenStage** provides fundamental building blocks for data processing pipelines that include support for back-pressure: a critical capability of reliable data pipelines.
+
+**GenServer** allows building servers, **GenStage** allows building *stages* which are pieces of a data pipeline.
+
+simple
+
+```mermaid
+graph LR;
+  Stage1(Stage)-->Stage2(Stage)-->Stage3(Stage)-->Stage4(Stage);
+```
+
+or complex
+
+```mermaid
+graph LR;
+  Stage1A(Stage)-->Stage2A(Stage);
+  Stage1A(Stage)-->Stage2B(Stage);
+  
+  Stage1B(Stage)-->Stage2A(Stage);
+  Stage1B(Stage)-->Stage2B(Stage);
+
+  Stage2A(Stage)-->Stage3A(Stage);
+  Stage2A(Stage)-->Stage3B(Stage);
+  Stage2A(Stage)-->Stage3C(Stage);
+
+  Stage2B(Stage)-->Stage3A(Stage);
+  Stage2B(Stage)-->Stage3B(Stage);
+  Stage2B(Stage)-->Stage3C(Stage);
+
+  Stage3A(Stage)-->Stage4(Stage)
+  Stage3B(Stage)-->Stage4(Stage)
+  Stage3C(Stage)-->Stage4(Stage)
+```

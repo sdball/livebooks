@@ -21,3 +21,7 @@ High level notes and code examples.
 * [Introducing DynamicSupervisor](chapter2_dynamic-supervisor.livemd)
 * [Implementing a supervisor](chapter2_implementing-supervisor.livemd)
 * [Naming processes using the registry](chapter2_naming-processes.livemd)
+
+## Chapter 3 - GenStage
+
+* [Introducing GenStage](chapter3-introducing-genstage.livemd)
