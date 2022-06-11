@@ -1,0 +1,258 @@
+<!-- vim: set syntax=markdown: -->
+
+# Stephen's Strange Leaflet about Elixir - Page 6
+
+```elixir
+Mix.install([
+  {:kino, "~> 0.6.1"},
+  {:kino_vega_lite, "~> 0.1.1"}
+])
+
+alias VegaLite, as: Vl
+```
+
+## If you don't have this open in Livebook you should
+
+[![Run in Livebook](https://livebook.dev/badge/v1/blue.svg)](https://livebook.dev/run?url=https%3A%2F%2Fgithub.com%2Fsdball%2Flivebooks%2Fblob%2Fmain%2Fbooks%2Fstrange-leaflet-about-elixir%2Fpage6.livemd)
+
+## Put your state in a server
+
+To the Elixir outsider **GenServer** sounds like a wildly irresponsible idea. Start up an entire server simply to hold some state? What?
+
+Well that's Elixir processes for you. Remember you can think of them as cheap as instantiating an object if you're used to object oriented languages. You may think nothing of generating objects for every row of a database query, or every piece of data making up a row of a database query, or every piece of data anywhere in your system.
+
+Processes are like that. There _are_ limits to the number of processes you can run on a single instance of BEAM just like there are limits to how many processes you can have running on a normal computer operating system. But that's rarely a limitation you have to think about day to day unless you are doing something really cool.
+
+Let's look at how our Livebook system behaves when we spawn a lot of agents to hold random data and then what happens when we stop them again.
+
+## Watching the memory usage of our Livebook node
+
+```elixir
+defmodule MemoryPlot do
+  def new() do
+    Vl.new(width: 600, height: 400, padding: 20)
+    |> Vl.repeat(
+      [layer: ["total", "processes", "atom", "binary", "code", "ets"]],
+      Vl.new()
+      |> Vl.mark(:area)
+      |> Vl.encode_field(:x, "iter", type: :quantitative, title: "Measurement")
+      |> Vl.encode_repeat(:y, :layer, type: :quantitative, title: "Memory usage (MB)")
+      |> Vl.encode(:color, datum: [repeat: :layer], type: :nominal)
+    )
+    |> Kino.VegaLite.new()
+  end
+end
+```
+
+```elixir
+memory_plot = MemoryPlot.new()
+```
+
+## Spawning agents while we record memory usage above
+
+```elixir
+Kino.VegaLite.periodically(memory_plot, 200, 1, fn i ->
+  point =
+    :rpc.call(node(), :erlang, :memory, [])
+    |> Enum.map(fn {type, bytes} -> {type, bytes / 1_000_000} end)
+    |> Map.new()
+    |> Map.put(:iter, i)
+
+  Kino.VegaLite.push(memory_plot, point, window: 1000)
+
+  if i < 30 do
+    {:cont, i + 1}
+  else
+    :halt
+  end
+end)
+
+Process.sleep(1000)
+
+agents =
+  for i <- 1..100_000 do
+    Agent.start_link(fn -> i end)
+  end
+
+Process.sleep(1000)
+
+agents
+|> Enum.map(fn {:ok, agent} ->
+  Agent.stop(agent)
+end)
+
+nil
+```
+
+On my system we start off around ~40MB of memory, then shoot up to aronud 350MB with one hundred thousand agents, and then drop back down to the original level when the agents are stopped.
+
+That drop back down is a key. Because processes are self-contained units of memory they almost entirely be cleaned up from the system when stopped.
+
+## Processes are cheap
+
+The gist is that processes are cheap.
+
+An Elixir web server may well spawn a process per web request whose livecycle is tied to the request.
+
+An Elixir key/value store may well spawn a process for every value stored in the system so each value can keep track of its own lifecycle. No need for a global watcher to iterate through a massive list of values and find the ones that are at the end of their TTL. Spawn a process per value that is queued up with an internal timer to send itself a "delete" message when its TTL is up.
+
+An Elixir data transfer system may well spawn a process per piece of data moving through the system whose entire purpose in life is to ensure the data reaches its destination.
+
+## Ok so GenServer and state
+
+How does GenServer manage state? One message at a time.
+
+Remember processes can ONLY send messages to each other. No process can sneak into another processes' data and change something. No process can directly call a function to mutate data on another process. Only messages!
+
+That means a GenServer holding state doesn't have to worry about race conditions. Every message will be handling in turn and only one message will be handled at a time.
+
+If a GenServer wants to mutate its own state (say it's incresing a value every second) what do you think it does? Why it sends itself a message! No part of the system can jump the queue and race against anything else.
+
+Of course there can be conceptual race conditions. You can absolutely design a bad distributed system where a GenServer provides values that seem incorrect. But the point is that you be rest assured that it's possible to write correct distributed systems without having to handle the complexity of race conditions or mutexes or locking yourself.
+
+Put more directly: a GenServer doesn't need to worry about race conditions internally. Its code can rest assured that when it is doing something it isn't competing with itself via shared memory access from multiple collaborators.
+
+### But GenServer and state?
+
+Oh right. So for each message the **GenServer** API ensures that a matching callback function on the GenServer is called with the message and the current state of the GenServer. The return value of the callback function provides the next version of the internal state even if unchanged.
+
+Think of it like watching a movie on a TV. The TV is the GenServer. The TV has a current state which is the current frame of the movie. When the message from the playback system arrives "hey TV here's the next frame" the TV updates its internal state with the new frame and then waits for the next message. The TV does not edit the data of the current frame to match the new data. It simply discards its current frame, inserts the new frame, and then waits for the cycle to repeat 24 to 60 times a second.
+
+That's what a GenServer does. Each message causes the current state to be loaded and then the returned new version of the state entirely wipes away the current state. Even if the state doesn't change.
+
+Yes I repeat myself but it'll help you remember.
+
+This is perhaps getting confusing. Let's write a GenServer!
+
+## A GenServer
+
+```elixir
+defmodule GameServer do
+  use GenServer
+
+  def init(_init_arg) do
+    {:ok, %{score: 0}}
+  end
+end
+```
+
+Sorry I guess that wasn't very exciting after all. But make no mistake that bit of code up there is indeed a GenServer. Well it's the description of one.
+
+The `use GenServer` line is telling Elixir we want our module to include a **behavior**. That behavior has certain expections and requirements, but it also supplies basic functions that meet the bare minimum of those requirements out of the box.
+
+The only callback function we've explicitly defined so far is `init/1` which accepts an initial argument for the GenServer. We're totally ignoring the initial argument in our function and supplying a hardcoded initial state of `%{score: 0}`. This is a GameServer after all.
+
+```elixir
+{:ok, genserver} = GenServer.start(GameServer, nil)
+```
+
+And we're off! We now have a process running in the system holding on to the state `%{score: 0}`. It isn't actually DOING anything right now, but it's in a message receiving loop. As soon as it receives a message it will do something!
+
+Let's send it a message.
+
+```elixir
+Process.send(genserver, :hello, [])
+```
+
+Check it out! That's one of the default callbacks added by the `use GenServer` behavior. In this case the default implementation for `handle_info/2` returns an error for any message.
+
+`handle_info/2` is the callback that handles any messages sent to the GenServer with a low level `Process.send/3`. There are higher level GenServer specific messages we'll see in a second, but for right now let's teach our GenServer how to handle the `:hello` message.
+
+```elixir
+defmodule GameServer.V2 do
+  use GenServer
+
+  def init(_init_arg) do
+    {:ok, %{score: 0}}
+  end
+
+  def handle_info(:hello, state) do
+    IO.puts("I got a :hello message and my current state is #{inspect(state)}")
+    {:noreply, state}
+  end
+end
+```
+
+```elixir
+if Process.alive?(genserver) do
+  GenServer.stop(genserver)
+end
+
+{:ok, genserver} = GenServer.start(GameServer.V2, 0)
+```
+
+```elixir
+Process.send(genserver, :hello, [])
+```
+
+Note that the actual returned value from our `Process.send/3` call is simply `:ok`.
+
+That's because the `handle_info` callback doesn't keep track of the PID that originally sent the message so our GenServer doesn't know where to send a response even if it wanted to.
+
+There are two types of message handling callbacks available to a GenServer: synchronous and asynchronous.
+
+A synchronous callback guarantees a roundtrip answer from the GenServer to the caller.
+
+An asynchronous callback sends an immediate `:ok` back no matter what. The message is cast out into the void and you have no way of knowing if the GenServer ever received it.
+
+You might think there's no reason to ever use asynchronous messaging but it's far more useful than you may think. Asynchronous messages are much more efficient for the system as a whole because it doesn't require any coordination between processes. For a synchronous message the call out to a GenServer is blocking: the process will wait until it gets the answer back from the GenServer. Many times that's what you want but certainly not always.
+
+### Synchronous GenServer calls
+
+* `GenServer.call` -> `handle_call/3`
+
+### Asynchronous GenServer calls
+
+* `GenServer.cast` -> `handle_cast/2`
+* regular `Process.send` messages -> `handle_info/2`
+
+### Back to state?
+
+Yeah let's show how a GenServer can drop all of its state. There's nothing magical about the state, it's simply data passing through a function.
+
+```elixir
+defmodule GameServer.V3 do
+  use GenServer
+
+  def init(_init_arg) do
+    {:ok, %{score: 0}}
+  end
+
+  def handle_info(:hello, state) do
+    IO.puts("I got a :hello message and my current state is #{inspect(state)}")
+    {:noreply, state}
+  end
+
+  def handle_info(:zap, _state) do
+    IO.puts("zap")
+    new_state = nil
+    {:noreply, new_state}
+  end
+end
+```
+
+```elixir
+if Process.alive?(genserver) do
+  GenServer.stop(genserver)
+end
+
+{:ok, genserver} = GenServer.start(GameServer.V3, 0)
+```
+
+```elixir
+Process.send(genserver, :zap, [])
+Process.send(genserver, :hello, [])
+```
+
+You see? Nothing magic! The state the GenServer holds is whatever state is returned from its last callback. You can have messages that empty out the state, morph the state into a new data structure, add keys, remove keys, increment values, spawn new GenServers, whatever!
+
+This approach forces you as the developer to explicitly handle your state. It can no longer accidentally accumulate inside of objects in your application as they mutate their internal data.
+
+We have no state but what we make.
+
+![](https://raw.githubusercontent.com/sdball/livebooks/main/books/strange-leaflet-about-elixir/images/no-state.png)
+
+
+<!-- livebook:{"break_markdown":true} -->
+
+« [back to page 5](page5.livemd) || [turn to page 7](page7.livemd) »
