@@ -1,0 +1,194 @@
+<!-- vim: set syntax=markdown: -->
+
+# Stephen's Strange Leaflet about Elixir - Page 5
+
+```elixir
+Mix.install([
+  {:kino, "~> 0.6.1"}
+])
+```
+
+## If you don't have this open in Livebook you should
+
+[![Run in Livebook](https://livebook.dev/badge/v1/blue.svg)](https://livebook.dev/run?url=https%3A%2F%2Fgithub.com%2Fsdball%2Flivebooks%2Fblob%2Fmain%2Fbooks%2Fstrange-leaflet-about-elixir%2Fpage5.livemd)
+
+## Immutable data?
+
+Ok Stephen, you might say, Elixir sounds really great and all but I heard it has immutable data and that doesn't make any sense to me.
+
+Yeah hypothetical reader, it's a weird idea at first. Immutable data? How does that even work and how could it be useful?
+
+Well first let me clear things up. You can _conceptually_ have mutable data. Of course you can. That's how systems work and change over time! The key is that data values cannot, CANNOT, be changed directly. You can be forever assured that at no point will any of your collaborators reach into your data and change something. It is flatly impossible. Impassable. It is not possible to pass.
+
+You can have code that _looks_ like it mutates state, but I assure you no data values are ever mutated.
+
+Elixir has one way to change data: reassign the label attached to the data. The **data** is still unchanged, but the label (i.e. the variable name) can be pointed at new data.
+
+```elixir
+x = 6
+x + 7
+```
+
+That code outputs 13 so it might seem like the value of x is changed. But it is not. `x` is still 6. All we did is add 7 to x and the result of that calculation went nowhere.
+
+```elixir
+x
+```
+
+If we want x to update to be the result of the calculation, we will ahve to reassign it.
+
+```elixir
+x = x + 7
+```
+
+```elixir
+x
+```
+
+This is probably not too surprising, even for programmers who are used to mutable data.
+
+I find that doing module level transforms is a bit more surprising to many devs. But the mechanics are the same. Functions in Elixir may output new data. But no function in Elixir can change the underlying values of any data ever. Changes are only permanent if they are explicitly assigned.
+
+```elixir
+# => "hello"
+string = "hello"
+# => "HELLO"
+String.upcase(string)
+# => "hello"
+string
+```
+
+List operations are perhaps even more surprising. But again the mechanics are the same. You cannot change a list unless you explicitly assign the change.
+
+```elixir
+# => [1, 2, 3]
+list = [1, 2, 3]
+# => [2, 3, 4]
+# => [1, 2, 3]
+Enum.map(list, &(&1 + 1)).list
+```
+
+You also can be absolutely 100% guaranteed to be safe from functions mutating the data you pass into them. This is a critical bit. Elixir functions **cannot** permanently modify the data they are given.
+
+Of course a function can internally change and reassign the data, sure why not? But the actual data given to the function is completely safe from alterations. Whatever the function may do, our data is not going to be changed.
+
+```elixir
+defmodule DataChanger do
+  def change(value) when is_map(value) do
+    value = Map.put(value, :lord, "melon")
+    IO.puts("Mwahaha! I have changed the value I was given! #{inspect(value)}")
+    value
+  end
+end
+```
+
+```elixir
+my_map = %{critical: "data"}
+```
+
+```elixir
+DataChanger.change(my_map)
+```
+
+The output sure looks scary oh no! Did our data change?
+
+```elixir
+my_map
+```
+
+No of course not. The function can do whatever it does and return whatever it wants. But unless we choose to assign the resulting value then our data is not mutated.
+
+## The heart of immutable data
+
+That's really the core of what immutable data means. Data that does not mutate unless you explicitly take some action to allow new data to take the place of old data.
+
+## But I want to mutate data
+
+Sure, we all do. State is a real thing that really needs to change at real times.
+
+The choice Elixir makes is to make you explicitly handle state. State simply cannot change all higgilty-piggilty around the system. But **you** can choose to start a process that holds a state.
+
+That process you start to hold state can send responses to messages like "what is your state right now?" That process you start to hold state can update (NOT mutate) its internal state in response to a message.
+
+How does that work?
+
+You send messages!
+
+Let's say we have a super simple process that simply holds a value.
+
+Let's say you want to ask for the current value.
+
+1. Send a message `:get_value`
+2. The process receives the message and knows how to answer `:get_value`
+3. The process has its current value in memory
+4. The process sends a return message with the value
+
+Let's say you want to update the current value.
+
+1. Send a message `:update_value, 8` (where 8 is the new value)
+2. The process again receives the message and knows how to answer `:update_value, value`
+3. The process REPLACES its current value with the new value
+4. The process sends an `:ok` message back
+
+Let's see this idea in action. Elixir provides an **Agent** module as part of its standard library for exactly this kind of behavior. And **GenServer** (generic server) if we need more than the basics.
+
+```elixir
+{:ok, agent} = Agent.start_link(fn -> [] end)
+```
+
+Notice what we got back from the `Agent.start_link/1` function. `:ok` and a PID. We just started a new process! That process has `[]` as its initial state and it's now an active, living, working memory of the society of our application. We have a collaborator! It's linked to our process and everything.
+
+```elixir
+agent_link = Process.info(agent) |> Keyword.get(:links) |> Enum.at(0)
+
+agent_link == self()
+```
+
+Let's see what it's doing right now.
+
+```elixir
+Process.info(agent) |> Keyword.get(:current_function)
+```
+
+Yeah remember how I said Elixir provides **Agent** for the basics and **GenServer** for more complex cases a few sentences ago? Well Agent is really a GenServer under the hood, it's just doing a lot of default boilerplate for us.
+
+Let's give it some new data.
+
+```elixir
+Agent.update(agent, fn state ->
+  # push 3 onto the state list
+  [3 | state]
+end)
+```
+
+Hold on! You may say. `[113 | state]` SURE LOOKS LIKE MUTATION!
+
+Well it might. But it isn't. `[113 | state]` does indeed push `113` into the list. But it does not mutate the list: it returns the updated list.
+
+Agent uses the return value of our `update` function to assign a new internal state.
+
+```elixir
+list =
+  []
+  |> IO.inspect(label: "start")
+
+[3 | list] |> IO.inspect(label: "result of pushing 3")
+
+list |> IO.inspect(label: "after push of 3")
+```
+
+```elixir
+Agent.get(agent, fn state ->
+  state
+end)
+```
+
+```elixir
+Agent.stop(agent)
+```
+
+I hope you've enjoyed this small sojourn into the world of immutable data. How about next time we dive back into Agents and GenServer itself? The state abstraction so nice it's survived for decades now and what enables everything from telephone calls to WhatsApp.
+
+<!-- livebook:{"break_markdown":true} -->
+
+« [back to page 4](page4.livemd) || [turn to page 6](page6.livemd) »
