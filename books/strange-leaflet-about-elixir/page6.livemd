@@ -1,4 +1,4 @@
-<!-- vim: set syntax=markdown: -->
+<!-- vim: set syntax=markdown ft=markdown: -->
 
 # Stephen's Strange Leaflet about Elixir - Page 6
 
@@ -84,7 +84,7 @@ end)
 nil
 ```
 
-On my system we start off around ~40MB of memory, then shoot up to aronud 350MB with one hundred thousand agents, and then drop back down to the original level when the agents are stopped.
+On my system we start off around ~40MB of memory, then shoot up to around 350MB with one hundred thousand agents, and then drop back down to the original level when the agents are stopped.
 
 That drop back down is a key. Because processes are self-contained units of memory they almost entirely be cleaned up from the system when stopped.
 
@@ -92,7 +92,7 @@ That drop back down is a key. Because processes are self-contained units of memo
 
 The gist is that processes are cheap.
 
-An Elixir web server may well spawn a process per web request whose livecycle is tied to the request.
+An Elixir web server may well spawn a process per web request whose lifecycle is tied to the request.
 
 An Elixir key/value store may well spawn a process for every value stored in the system so each value can keep track of its own lifecycle. No need for a global watcher to iterate through a massive list of values and find the ones that are at the end of their TTL. Spawn a process per value that is queued up with an internal timer to send itself a "delete" message when its TTL is up.
 
@@ -106,7 +106,7 @@ Remember processes can ONLY send messages to each other. No process can sneak in
 
 That means a GenServer holding state doesn't have to worry about race conditions. Every message will be handling in turn and only one message will be handled at a time.
 
-If a GenServer wants to mutate its own state (say it's incresing a value every second) what do you think it does? Why it sends itself a message! No part of the system can jump the queue and race against anything else.
+If a GenServer wants to mutate its own state (say it's increasing a value every second) what do you think it does? Why it sends itself a message! No part of the system can jump the queue and race against anything else.
 
 Of course there can be conceptual race conditions. You can absolutely design a bad distributed system where a GenServer provides values that seem incorrect. But the point is that you be rest assured that it's possible to write correct distributed systems without having to handle the complexity of race conditions or mutexes or locking yourself.
 
@@ -138,7 +138,7 @@ end
 
 Sorry I guess that wasn't very exciting after all. But make no mistake that bit of code up there is indeed a GenServer. Well it's the description of one.
 
-The `use GenServer` line is telling Elixir we want our module to include a **behavior**. That behavior has certain expections and requirements, but it also supplies basic functions that meet the bare minimum of those requirements out of the box.
+The `use GenServer` line is telling Elixir we want our module to include a **behavior**. That behavior has certain expectations and requirements, but it also supplies basic functions that meet the bare minimum of those requirements out of the box.
 
 The only callback function we've explicitly defined so far is `init/1` which accepts an initial argument for the GenServer. We're totally ignoring the initial argument in our function and supplying a hardcoded initial state of `%{score: 0}`. This is a GameServer after all.
 

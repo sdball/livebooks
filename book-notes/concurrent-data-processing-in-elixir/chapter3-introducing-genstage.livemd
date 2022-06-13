@@ -1,16 +1,22 @@
 # Chapter 3 - Introducing GenStage
 
+```elixir
+Mix.install([
+  {:gen_stage, "~> 1.1"}
+])
+```
+
 ## Intro
 
 **GenStage** provides fundamental building blocks for data processing pipelines that include support for back-pressure: a critical capability of reliable data pipelines.
 
 **GenServer** allows building servers, **GenStage** allows building *stages* which are pieces of a data pipeline.
 
-simple
+Which can be simple
 
 ```mermaid
 graph LR;
-  Stage1(Stage)-->Stage2(Stage)-->Stage3(Stage)-->Stage4(Stage);
+  Stage1(Stage) --> Stage2(Stage) --> Stage3(Stage) --> Stage4(Stage);
 ```
 
 or complex
@@ -34,4 +40,201 @@ graph LR;
   Stage3A(Stage)-->Stage4(Stage)
   Stage3B(Stage)-->Stage4(Stage)
   Stage3C(Stage)-->Stage4(Stage)
+```
+
+In GenStage it's the last stage of a pipeline that controls the flow of data. Its demand for data is what drives data moving through the stages. If the last stage does not ask for data then the data does not flow.
+
+```mermaid
+graph LR;
+  Stage1(Stage)-->Stage2(Stage)-->Stage3(Stage)-->Stage4(Stage);
+  Stage4-.req data.->Stage3
+  Stage3-.req data.->Stage2
+  Stage2-.req data.->Stage1
+```
+
+This design decision ensure that **back-pressure** is always present in the system. If any stage is too busy to ask for data then the data flow naturally stops as well.
+
+There are three different types of stages
+
+* producer: produces events (any Elixir data type)
+* consumer: receives events, subscribes to a producer
+* producer/consumer: does what you think
+
+## Build a pipeline
+
+```elixir
+defmodule Scraper do
+  def work() do
+    1..5
+    |> Enum.random()
+    |> :timer.seconds()
+    |> Process.sleep()
+  end
+end
+```
+
+```elixir
+defmodule PageProducer do
+  use GenStage
+  require Logger
+
+  def start_link(_args) do
+    initial_state = []
+    GenStage.start_link(__MODULE__, initial_state, name: __MODULE__)
+  end
+
+  def init(initial_state) do
+    Logger.info("PageProducer init")
+    {:producer, initial_state}
+  end
+
+  def handle_demand(demand, state) do
+    Logger.info("PageProducer received demand for #{demand} pages")
+    events = []
+    {:noreply, events, state}
+  end
+end
+```
+
+```elixir
+defmodule PageConsumer do
+  use GenStage
+  require Logger
+
+  def start_link(_args) do
+    initial_state = []
+    GenStage.start_link(__MODULE__, initial_state)
+  end
+
+  def init(initial_state) do
+    Logger.info("PageConsumer init")
+    {:consumer, initial_state, subscribe_to: [PageProducer]}
+  end
+
+  def handle_events(events, _from, state) do
+    Logger.info("PageConsumer received #{inspect(events)}")
+
+    Enum.each(events, fn _page ->
+      Scraper.work()
+    end)
+
+    {:noreply, [], state}
+  end
+end
+```
+
+```elixir
+defmodule Scraper.Application do
+  require Logger
+
+  def start() do
+    children = [
+      PageProducer,
+      PageConsumer
+    ]
+
+    opts = [strategy: :one_for_one, name: Scraper.Supervisor]
+
+    case Supervisor.start_link(children, opts) do
+      {:error, {:already_started, pid}} ->
+        Logger.info("Restarting supervisor #{inspect(pid)}")
+        Supervisor.stop(pid)
+        start()
+
+      result ->
+        result
+    end
+  end
+end
+```
+
+```elixir
+Scraper.Application.start()
+```
+
+```
+15:25:19.955 [info]  PageProducer init
+
+15:25:19.955 [info]  PageConsumer init
+
+15:25:19.955 [info]  PageProducer received demand for 1000 pages
+```
+
+<!-- livebook:{"break_markdown":true} -->
+
+**GenStage** optimizes the data flow for peak efficiency that keeps producers and consumers busy. By default the **max_demand** of a consumer is 1000 and the **min_demand** is 500. When starting up a consumer will start off asking for its max_demand.
+
+You can set **max_demand** of one if you want to ensure jobs aren't processed in batches.
+
+```elixir
+defmodule PageConsumer do
+  use GenStage
+  require Logger
+
+  def start_link(_args) do
+    initial_state = []
+    GenStage.start_link(__MODULE__, initial_state)
+  end
+
+  def init(initial_state) do
+    Logger.info("PageConsumer init")
+
+    subscriptions = [
+      {PageProducer, min_demand: 0, max_demand: 3}
+    ]
+
+    {:consumer, initial_state, subscribe_to: subscriptions}
+  end
+
+  def handle_events(events, _from, state) do
+    Logger.info("PageConsumer received #{inspect(events)}")
+
+    Enum.each(events, fn _page ->
+      Scraper.work()
+    end)
+
+    {:noreply, [], state}
+  end
+end
+```
+
+```elixir
+defmodule PageProducer do
+  use GenStage
+  require Logger
+
+  def start_link(_args) do
+    initial_state = []
+    GenStage.start_link(__MODULE__, initial_state, name: __MODULE__)
+  end
+
+  def init(initial_state) do
+    Logger.info("PageProducer init")
+    {:producer, initial_state}
+  end
+
+  def handle_demand(demand, state) do
+    Logger.info("PageProducer received demand for #{demand} pages")
+    events = []
+    {:noreply, events, state}
+  end
+
+  def scrape_pages(pages) when is_list(pages) do
+    GenStage.cast(__MODULE__, {:pages, pages})
+  end
+
+  def handle_cast({:pages, pages}, state) do
+    {:noreply, pages, state}
+  end
+end
+```
+
+```elixir
+Scraper.Application.start()
+```
+
+```elixir
+pages = ["page1", "page2", "page3", "page4", "page5"]
+
+PageProducer.scrape_pages(pages)
 ```

@@ -1,4 +1,4 @@
-<!-- vim: set syntax=markdown: -->
+<!-- vim: set syntax=markdown ft=markdown: -->
 
 # Stephen's Strange Leaflet about Elixir - Page 1
 
@@ -44,9 +44,9 @@ This is not code right here. Only text. But the contents are the same.
 
 Unlike the code before that little snippet of text is only Elixir-highlighted code. It's not real. It's only text. That is, it's only data. But it's not evaluated data. It's just a `0` printed on your screen. That's all it will ever do: be a `0`. We can't add to it, ask it if it is in fact a `0`, or crash an Elixir process by dividing by it. It simply is.
 
-There's a peace to that. A satisfaction. There is where I am and this is where I'll be, it says. That first zero we saw in the actual evalating code block was much more involved with itself. It wasn't simply text, it was CODE. A value passing through lines of code down through many layers of abstraction to hit the transitors on your fancy CPU cores and then back up again.
+There's a peace to that. A satisfaction. There is where I am and this is where I'll be, it says. That first zero we saw in the actual evaluating code block was much more involved with itself. It wasn't simply text, it was CODE. A value passing through lines of code down through many layers of abstraction to hit the transistors on your fancy CPU cores and then back up again.
 
-> …In the land of motherboard, in the fires of Mount CPU, the Dark Lord Transitor forged in secret a master Ring, to control all others. And into this Ring he poured his cruelty, his malice and his will to dominate all life. One Ring to rule them all.
+> …In the land of motherboard, in the fires of Mount CPU, the Dark Lord Transistor forged in secret a master Ring, to control all others. And into this Ring he poured his cruelty, his malice and his will to dominate all life. One Ring to rule them all.
 
 ![](https://raw.githubusercontent.com/sdball/livebooks/main/books/strange-leaflet-about-elixir/images/dark-lord-sauron.jpeg)
 

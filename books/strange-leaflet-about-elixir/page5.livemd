@@ -1,4 +1,4 @@
-<!-- vim: set syntax=markdown: -->
+<!-- vim: set syntax=markdown ft=markdown: -->
 
 # Stephen's Strange Leaflet about Elixir - Page 5
 
@@ -35,7 +35,7 @@ That code outputs 13 so it might seem like the value of x is changed. But it is 
 x
 ```
 
-If we want x to update to be the result of the calculation, we will ahve to reassign it.
+If we want x to update to be the result of the calculation, we will have to reassign it.
 
 ```elixir
 x = x + 7

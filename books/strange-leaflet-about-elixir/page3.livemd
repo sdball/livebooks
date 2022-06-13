@@ -1,4 +1,4 @@
-<!-- vim: set syntax=markdown: -->
+<!-- vim: set syntax=markdown ft=markdown: -->
 
 # Stephen's Strange Leaflet about Elixir - Page 3
 
