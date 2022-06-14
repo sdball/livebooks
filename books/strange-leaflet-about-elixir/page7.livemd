@@ -1,0 +1,264 @@
+<!-- vim: set syntax=markdown ft=markdown: -->
+
+# Stephen's Strange Leaflet about Elixir - Page 7
+
+```elixir
+Mix.install([
+  {:kino, "~> 0.6.1"}
+])
+```
+
+## If you don't have this open in Livebook you should
+
+[![Run in Livebook](https://livebook.dev/badge/v1/blue.svg)](https://livebook.dev/run?url=https%3A%2F%2Fgithub.com%2Fsdball%2Flivebooks%2Fblob%2Fmain%2Fbooks%2Fstrange-leaflet-about-elixir%2Fpage7.livemd)
+
+## Pattern matching is civilization
+
+You may have noticed some odd code in the previous pages if you aren't used to Elixir. Like that `PasswordSystem` that looked like this
+
+<!-- livebook:{"force_markdown":true} -->
+
+```elixir
+defmodule PasswordSystem do
+  def check("my voice is my passport") do
+    {:ok, :access_granted}
+  end
+
+  def check(_password) do
+    Process.sleep(3000)
+    {:error, :access_denied}
+  end
+end
+```
+
+What's up with those TWO definitions of the same function?
+
+Well I'll tell ya. Pattern matching!
+
+## Pattern matching function arguments
+
+Elixir allows functions of the same name and arity (number of arguments) to overlap with different patterns to match. You can match on literal values or guard clauses such as `is_map` or `is_list` or conditional guards such as `> 0`
+
+The functions can be declared in any order, but match from top to bottom.
+
+If you declare functions that compete with each other such as two functions with the same pattern or a specific function following a general function then the Elixir compiler will complain.
+
+```elixir
+defmodule Patterns do
+  def echo(arg) do
+    IO.puts("I don't know what kind of argument that is but I got #{inspect(arg)}")
+  end
+
+  def echo(_arg) do
+    IO.puts("I don't know what that is")
+  end
+end
+```
+
+```elixir
+Patterns.echo(123)
+```
+
+In this example we have a more specific function (matching the argument `123`) following a general function that ignores any argument.
+
+```elixir
+defmodule Patterns do
+  def echo(arg) do
+    IO.puts("I don't know what kind of argument that is but I got #{inspect(arg)}")
+  end
+
+  def echo(123) do
+    IO.puts("I don't know what that is")
+  end
+end
+```
+
+```elixir
+Patterns.echo(123)
+```
+
+Here we go, declaring the more specific function BEFORE the more general function.
+
+```elixir
+defmodule Patterns do
+  def echo(123) do
+    IO.puts("Oh I know for certain that is 123")
+  end
+
+  def echo(arg) do
+    IO.puts("I don't know what kind of argument that is but I got #{inspect(arg)}")
+  end
+end
+```
+
+```elixir
+Patterns.echo(123)
+
+Patterns.echo("123")
+```
+
+Let's match a bunch of things, that should help convey the idea.
+
+```elixir
+defmodule Patterns do
+  def echo(123) do
+    IO.puts("Oh I know for certain that's the Integer 123")
+  end
+
+  def echo(arg) when is_number(arg) and arg < 0 do
+    IO.puts("Oh I know that #{inspect(arg)} is definitely a negative number")
+  end
+
+  def echo(arg) when is_number(arg) and arg > 0 do
+    IO.puts("Oh I know that #{inspect(arg)} is definitely a positive number")
+  end
+
+  def echo(0) do
+    IO.puts("Oh I know for certain that's the Integer 0")
+  end
+
+  def echo(arg) when is_list(arg) do
+    IO.puts("Oh I know that #{inspect(arg)} is definitely a list")
+  end
+
+  def echo(arg) when is_map(arg) do
+    IO.puts("Oh I know that #{inspect(arg)} is definitely a map")
+  end
+
+  def echo(arg) do
+    IO.puts("I don't know what kind of argument that is but I got #{inspect(arg)}")
+  end
+end
+```
+
+```elixir
+Patterns.echo([1, 2, 3])
+Patterns.echo(%{a: 1, b: 2})
+Patterns.echo(-10)
+Patterns.echo(0)
+Patterns.echo(10)
+Patterns.echo(123)
+Patterns.echo("some string")
+```
+
+A great thing about pattern matching functions is that you can write clear, specific functions for a specific type or value of argument. You can avoid litering `if` checks around your code: you can write exactly what you need for exactly those arguments!
+
+## Pattern matching return values
+
+Pattern matching isn't only for function arguments. You can also use it to match returned values!
+
+```elixir
+defmodule Scanner do
+  def scan(:gold) do
+    {:ok, :gold}
+  end
+
+  def scan(:silver) do
+    {:ok, :silver}
+  end
+
+  def scan(_element) do
+    {:error, :unknown}
+  end
+end
+```
+
+That means you can use it to guarantee that your code is proceeding with a specific assertion. (Because otherwise the line of execution has already blown up.)
+
+```elixir
+element = :gold
+
+{:ok, :gold} = Scanner.scan(element)
+
+IO.puts("at this point we know the scanner scanned :gold")
+```
+
+```elixir
+element = :copper
+
+{:ok, :gold} = Scanner.scan(element)
+
+IO.puts("at this point we know the scanner scanned :gold")
+```
+
+Another common use is the `case` statement to handle various kinds of return values.
+
+```elixir
+element = Enum.random([:copper, :silver, :gold])
+
+case Scanner.scan(element) do
+  {:ok, detected} ->
+    IO.puts("The scan found a known element: #{detected}")
+    detected
+
+  {:error, _} ->
+    IO.puts("unknown result")
+    :unknown
+end
+```
+
+## Pattern matching messages
+
+Pattern matching messages is simply pattern matching function arguments, but the way Elixir's design of processes messages and pattern matching fit together is such an elegant design that it's nice to call out.
+
+When writing a GenServer or other interface for processes to communicate with messages you can write short, specific functions of each callback to handle exactly the message they're meant to handle. No need to have a huge `case` statement or defensive coding. You write what you need and no more. Freedom!
+
+```elixir
+defmodule GameServer do
+  use GenServer
+
+  def init(_arg) do
+    {:ok, %{score: 0}}
+  end
+
+  def handle_call(:increment, from, state) do
+    handle_call({:plus, 1}, from, state)
+  end
+
+  def handle_call({:plus, n}, _from, state = %{score: score}) do
+    new_score = score + n
+    {:reply, new_score, %{state | score: new_score}}
+  end
+
+  def handle_call(:score, _from, state = %{score: score}) do
+    {:reply, "the current score is #{score}", state}
+  end
+
+  def handle_call(:reset, _from, state) do
+    {:reply, 0, %{state | score: 0}}
+  end
+end
+```
+
+```elixir
+{:ok, genserver} = GenServer.start_link(GameServer, [])
+
+GenServer.call(genserver, :increment)
+|> IO.inspect()
+
+GenServer.call(genserver, :increment)
+|> IO.inspect()
+
+GenServer.call(genserver, :increment)
+|> IO.inspect()
+
+GenServer.call(genserver, {:plus, 7})
+|> IO.inspect()
+
+GenServer.call(genserver, :score)
+|> IO.inspect()
+
+GenServer.call(genserver, :reset)
+|> IO.inspect()
+
+GenServer.call(genserver, :score)
+|> IO.inspect()
+
+GenServer.stop(genserver)
+```
+
+Wonderful!
+
+<!-- livebook:{"break_markdown":true} -->
+
+« [back to page 6](page6.livemd) || [turn to page 8](page8.livemd) »
