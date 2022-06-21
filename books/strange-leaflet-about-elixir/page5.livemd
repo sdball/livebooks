@@ -50,22 +50,29 @@ This is probably not too surprising, even for programmers who are used to mutabl
 I find that doing module level transforms is a bit more surprising to many devs. But the mechanics are the same. Functions in Elixir may output new data. But no function in Elixir can change the underlying values of any data ever. Changes are only permanent if they are explicitly assigned.
 
 ```elixir
-# => "hello"
 string = "hello"
-# => "HELLO"
+```
+
+```elixir
 String.upcase(string)
-# => "hello"
+```
+
+```elixir
 string
 ```
 
 List operations are perhaps even more surprising. But again the mechanics are the same. You cannot change a list unless you explicitly assign the change.
 
 ```elixir
-# => [1, 2, 3]
 list = [1, 2, 3]
-# => [2, 3, 4]
-# => [1, 2, 3]
-Enum.map(list, &(&1 + 1)).list
+```
+
+```elixir
+Enum.map(list, &(&1 + 1))
+```
+
+```elixir
+list
 ```
 
 You also can be absolutely 100% guaranteed to be safe from functions mutating the data you pass into them. This is a critical bit. Elixir functions **cannot** permanently modify the data they are given.
@@ -98,6 +105,16 @@ my_map
 
 No of course not. The function can do whatever it does and return whatever it wants. But unless we choose to assign the resulting value then our data is not mutated.
 
+Even if we directly call destructive looking `Map` functions our data is safe **unless we reassign it**.
+
+```elixir
+Map.delete(my_map, :critical)
+  ```
+
+```elixir
+my_map
+```
+
 ## The heart of immutable data
 
 That's really the core of what immutable data means. Data that does not mutate unless you explicitly take some action to allow new data to take the place of old data.
@@ -106,13 +123,13 @@ That's really the core of what immutable data means. Data that does not mutate u
 
 Sure, we all do. State is a real thing that really needs to change at real times.
 
-The choice Elixir makes is to make you explicitly handle state. State simply cannot change all higgilty-piggilty around the system. But **you** can choose to start a process that holds a state.
+The choice Elixir makes is to ensure state only changes when you the developer explicitly decide it changes. State simply cannot change in any way all higgilty-piggilty around the system. But **you** can choose to start a process that holds a state and when that process updates its state.
 
-That process you start to hold state can send responses to messages like "what is your state right now?" That process you start to hold state can update (NOT mutate) its internal state in response to a message.
+That process you start to hold state can send responses to messages like "what is your state right now?" That process you start to hold state can replace (NOT mutate) its internal state in response to a message.
 
 How does that work?
 
-You send messages!
+Messages!
 
 Let's say we have a super simple process that simply holds a value.
 
@@ -161,9 +178,9 @@ Agent.update(agent, fn state ->
 end)
 ```
 
-Hold on! You may say. `[113 | state]` SURE LOOKS LIKE MUTATION!
+Hold on! You may say. `[3 | state]` SURE LOOKS LIKE MUTATION!
 
-Well it might. But it isn't. `[113 | state]` does indeed push `113` into the list. But it does not mutate the list: it returns the updated list.
+Well it might. But it isn't. `[3 | state]` does indeed push `3` into the list. But it does not mutate the list: it returns the updated list.
 
 Agent uses the return value of our `update` function to assign a new internal state.
 
