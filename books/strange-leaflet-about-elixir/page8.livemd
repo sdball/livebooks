@@ -91,9 +91,11 @@ collection
 
 What happened to that list that was returned from `Enum.into/2`? It's gone. Unless we assign a label to it.
 
-But let's drill down into `Enum.into/2`
+## Tracing Enum.into/2
 
-When collecting into a list that function essentially boils down to this
+Let's drill down into `Enum.into/2`
+
+When collecting into a list `Enum.into/2` results in this call
 
 <!-- livebook:{"force_markdown":true} -->
 
