@@ -164,7 +164,24 @@ Scraper.Application.start()
 
 **GenStage** optimizes the data flow for peak efficiency that keeps producers and consumers busy. By default the **max_demand** of a consumer is 1000 and the **min_demand** is 500. When starting up a consumer will start off asking for its max_demand.
 
-You can set **max_demand** of one if you want to ensure jobs aren't processed in batches.
+You can set **max_demand** of 1 if you want to ensure jobs aren't processed in batches.
+
+<!-- livebook:{"break_markdown":true} -->
+
+<!-- Learn more at https://mermaid-js.github.io/mermaid -->
+
+```mermaid
+sequenceDiagram
+    Consumer-->>Producer: Request 1000
+    Producer->>Consumer: Supply 1000
+    Consumer->>Consumer: 1000 remain
+    Consumer-->>Consumer: Process 500
+    Consumer->>Consumer: 500 remain
+    Consumer-->>Producer: Request 500
+    Producer->>Consumer: Supply 500
+    Consumer->>Consumer: 1000 remain
+    Consumer-->>Consumer: Process 500
+```
 
 ```elixir
 defmodule PageConsumer do
@@ -224,6 +241,165 @@ defmodule PageProducer do
   end
 
   def handle_cast({:pages, pages}, state) do
+    Logger.info("cast some pages #{inspect(pages)}")
+    {:noreply, pages, state}
+  end
+end
+```
+
+```elixir
+Supervisor.stop(Scraper.Supervisor)
+```
+
+```elixir
+Scraper.Application.start()
+```
+
+```elixir
+pages = ["page1", "page2", "page3", "page4", "page5"]
+
+PageProducer.scrape_pages(pages)
+PageProducer.scrape_pages(["page6", "page7"])
+```
+
+```elixir
+Supervisor.stop(Scraper.Supervisor)
+```
+
+## Adding more consumers
+
+Reduce consumer demand to `min: 0, max: 1`
+
+```elixir
+defmodule PageConsumer do
+  use GenStage
+  require Logger
+
+  def start_link(_args) do
+    initial_state = []
+    GenStage.start_link(__MODULE__, initial_state)
+  end
+
+  def init(initial_state) do
+    Logger.info("PageConsumer init")
+
+    subscriptions = [
+      {PageProducer, min_demand: 0, max_demand: 1}
+    ]
+
+    {:consumer, initial_state, subscribe_to: subscriptions}
+  end
+
+  def handle_events(events, _from, state) do
+    Logger.info("PageConsumer received #{inspect(events)}")
+
+    Enum.each(events, fn _page ->
+      Scraper.work()
+    end)
+
+    {:noreply, [], state}
+  end
+end
+```
+
+Start two parallel consumers.
+
+```elixir
+defmodule Scraper.Application do
+  require Logger
+
+  def start() do
+    children = [
+      PageProducer,
+      Supervisor.child_spec(PageConsumer, id: :consumer_a),
+      Supervisor.child_spec(PageConsumer, id: :consumer_b)
+    ]
+
+    opts = [strategy: :one_for_one, name: Scraper.Supervisor]
+
+    case Supervisor.start_link(children, opts) do
+      {:error, {:already_started, pid}} ->
+        Logger.info("Restarting supervisor #{inspect(pid)}")
+        Supervisor.stop(pid)
+        start()
+
+      result ->
+        result
+    end
+  end
+end
+```
+
+```elixir
+Scraper.Application.start()
+```
+
+```elixir
+pages = ["page1", "page2", "page3", "page4", "page5"]
+
+PageProducer.scrape_pages(pages)
+PageProducer.scrape_pages(["page6", "page7"])
+```
+
+```elixir
+Supervisor.stop(Scraper.Supervisor)
+```
+
+## What happens when producer buffer limit is exceeded?
+
+```elixir
+defmodule Scraper.Application do
+  require Logger
+
+  def start() do
+    children = [
+      PageProducer,
+      Supervisor.child_spec(PageConsumer, id: :consumer_a),
+      Supervisor.child_spec(PageConsumer, id: :consumer_b)
+    ]
+
+    opts = [strategy: :one_for_one, name: Scraper.Supervisor]
+
+    case Supervisor.start_link(children, opts) do
+      {:error, {:already_started, pid}} ->
+        Logger.info("Restarting supervisor #{inspect(pid)}")
+        Supervisor.stop(pid)
+        start()
+
+      result ->
+        result
+    end
+  end
+end
+```
+
+```elixir
+defmodule PageProducer do
+  use GenStage
+  require Logger
+
+  def start_link(_args) do
+    initial_state = []
+    GenStage.start_link(__MODULE__, initial_state, name: __MODULE__)
+  end
+
+  def init(initial_state) do
+    Logger.info("PageProducer init with buffer size 1")
+    {:producer, initial_state, buffer_size: 1}
+  end
+
+  def handle_demand(demand, state) do
+    Logger.info("PageProducer received demand for #{demand} pages")
+    events = []
+    {:noreply, events, state}
+  end
+
+  def scrape_pages(pages) when is_list(pages) do
+    GenStage.cast(__MODULE__, {:pages, pages})
+  end
+
+  def handle_cast({:pages, pages}, state) do
+    Logger.info("cast some pages #{inspect(pages)}")
     {:noreply, pages, state}
   end
 end
@@ -237,4 +413,403 @@ Scraper.Application.start()
 pages = ["page1", "page2", "page3", "page4", "page5"]
 
 PageProducer.scrape_pages(pages)
+PageProducer.scrape_pages(["page6", "page7"])
+```
+
+```elixir
+Supervisor.stop(Scraper.Supervisor)
+```
+
+## Adding concurrency with ConsumerSupervisor
+
+```elixir
+defmodule PageProducer do
+  use GenStage
+  require Logger
+
+  def start_link(_args) do
+    initial_state = []
+    GenStage.start_link(__MODULE__, initial_state, name: __MODULE__)
+  end
+
+  def init(initial_state) do
+    Logger.info("PageProducer init")
+    {:producer, initial_state}
+  end
+
+  def handle_demand(demand = 1, state) do
+    Logger.info("PageProducer received demand for #{demand} page")
+    events = []
+    {:noreply, events, state}
+  end
+
+  def handle_demand(demand, state) do
+    Logger.info("PageProducer received demand for #{demand} pages")
+    events = []
+    {:noreply, events, state}
+  end
+
+  def scrape_pages(pages) when is_list(pages) do
+    GenStage.cast(__MODULE__, {:pages, pages})
+  end
+
+  def handle_cast({:pages, pages}, state) do
+    Logger.info("cast some pages #{inspect(pages)}")
+    {:noreply, pages, state}
+  end
+end
+```
+
+```elixir
+defmodule PageConsumerSupervisor do
+  use ConsumerSupervisor
+  require Logger
+
+  def start_link(_args) do
+    ConsumerSupervisor.start_link(__MODULE__, :ok)
+  end
+
+  def init(:ok) do
+    Logger.info("PageConsumerSupervisor init")
+
+    children = [
+      %{
+        id: PageConsumer,
+        start: {PageConsumer, :start_link, []},
+        restart: :transient
+      }
+    ]
+
+    opts = [
+      strategy: :one_for_one,
+      subscribe_to: [
+        {PageProducer, max_demand: 2}
+      ]
+    ]
+
+    ConsumerSupervisor.init(children, opts)
+  end
+end
+```
+
+```elixir
+defmodule PageConsumer do
+  require Logger
+
+  def start_link(event) do
+    Logger.info("PageConsumer started by PageConsumerSupervisor with event #{event}")
+
+    Task.start_link(fn ->
+      Scraper.work()
+    end)
+  end
+end
+```
+
+```elixir
+defmodule Scraper.Application do
+  require Logger
+
+  def start() do
+    children = [
+      PageProducer,
+      PageConsumerSupervisor
+    ]
+
+    opts = [strategy: :one_for_one, name: Scraper.Supervisor]
+
+    case Supervisor.start_link(children, opts) do
+      {:error, {:already_started, pid}} ->
+        Logger.info("Restarting supervisor #{inspect(pid)}")
+        Supervisor.stop(pid)
+        start()
+
+      result ->
+        result
+    end
+  end
+end
+```
+
+```elixir
+Scraper.Application.start()
+```
+
+```elixir
+pages = ["page1", "page2", "page3", "page4", "page5"]
+
+PageProducer.scrape_pages(pages)
+PageProducer.scrape_pages(["page6", "page7"])
+```
+
+```elixir
+Supervisor.stop(Scraper.Supervisor)
+```
+
+## Multi-stage data pipelines
+
+```elixir
+defmodule Scraper do
+  def work() do
+    1..5
+    |> Enum.random()
+    |> :timer.seconds()
+    |> Process.sleep()
+  end
+
+  def online?(_url) do
+    work()
+    Enum.random([false, true, true])
+  end
+end
+```
+
+```elixir
+defmodule OnlinePageConsumer do
+  require Logger
+
+  def start_link(event) do
+    Logger.info("OnlinePageConsumer started with event #{event}")
+
+    Task.start_link(fn ->
+      Scraper.work()
+    end)
+  end
+end
+```
+
+```elixir
+defmodule OnlinePageProducerConsumer do
+  require Logger
+  use GenStage
+
+  def start_link(_args) do
+    initial_state = []
+    GenStage.start_link(__MODULE__, initial_state, name: __MODULE__)
+  end
+
+  def init(initial_state) do
+    Logger.info("OnlinePageProducerConsumer init")
+
+    subscription = [
+      {PageProducer, min_demand: 0, max_demand: 1}
+    ]
+
+    {:producer_consumer, initial_state, subscribe_to: subscription}
+  end
+
+  def handle_events(events, _from, state) do
+    Logger.info("OnlinePageProducerConsumer received #{inspect(events)}")
+    events = Enum.filter(events, &Scraper.online?/1)
+    Logger.info("Online: #{inspect(events)}")
+    {:noreply, events, state}
+  end
+end
+```
+
+```elixir
+defmodule OnlinePageConsumerSupervisor do
+  use ConsumerSupervisor
+  require Logger
+
+  def start_link(_args) do
+    ConsumerSupervisor.start_link(__MODULE__, :ok)
+  end
+
+  def init(:ok) do
+    Logger.info("PageConsumerSupervisor init")
+
+    children = [
+      %{
+        id: OnlinePageConsumer,
+        start: {OnlinePageConsumer, :start_link, []},
+        restart: :transient
+      }
+    ]
+
+    opts = [
+      strategy: :one_for_one,
+      subscribe_to: [
+        {OnlinePageProducerConsumer, max_demand: 2}
+      ]
+    ]
+
+    ConsumerSupervisor.init(children, opts)
+  end
+end
+```
+
+```elixir
+defmodule Scraper.Application do
+  require Logger
+
+  def start() do
+    children = [
+      PageProducer,
+      OnlinePageProducerConsumer,
+      OnlinePageConsumerSupervisor
+    ]
+
+    opts = [strategy: :one_for_one, name: Scraper.Supervisor]
+
+    case Supervisor.start_link(children, opts) do
+      {:error, {:already_started, pid}} ->
+        Logger.info("Restarting supervisor #{inspect(pid)}")
+        Supervisor.stop(Scraper.Supervisor)
+        start()
+
+      result ->
+        result
+    end
+  end
+end
+```
+
+```elixir
+Scraper.Application.start()
+```
+
+```elixir
+pages = ["page1", "page2", "page3", "page4", "page5"]
+
+PageProducer.scrape_pages(pages)
+PageProducer.scrape_pages(["page6", "page7"])
+```
+
+```elixir
+Supervisor.stop(Scraper.Supervisor)
+```
+
+## Scaling up a stage with extra processes
+
+```elixir
+defmodule Scraper.Application do
+  require Logger
+
+  def start() do
+    children = [
+      {Registry, keys: :unique, name: ProducerConsumerRegistry},
+      PageProducer,
+      producer_consumer_spec(id: 1),
+      producer_consumer_spec(id: 2),
+      OnlinePageConsumerSupervisor
+    ]
+
+    opts = [strategy: :one_for_one, name: Scraper.Supervisor]
+
+    case Supervisor.start_link(children, opts) do
+      {:error, {:already_started, pid}} ->
+        Logger.info("Restarting supervisor #{inspect(pid)}")
+        Supervisor.stop(pid)
+        start()
+
+      result ->
+        result
+    end
+  end
+
+  def producer_consumer_spec(id: id) do
+    id = "online_page_producer_consumer_#{id}"
+    Supervisor.child_spec({OnlinePageProducerConsumer, id}, id: id)
+  end
+
+  def stop() do
+    Supervisor.stop(Scraper.Supervisor)
+  end
+end
+```
+
+```elixir
+defmodule OnlinePageProducerConsumer do
+  require Logger
+  use GenStage
+
+  def start_link(id) do
+    initial_state = []
+    GenStage.start_link(__MODULE__, initial_state, name: via(id))
+  end
+
+  def init(initial_state) do
+    Logger.info("OnlinePageProducerConsumer init")
+
+    subscription = [
+      {PageProducer, min_demand: 0, max_demand: 1}
+    ]
+
+    {:producer_consumer, initial_state, subscribe_to: subscription}
+  end
+
+  def handle_events(events, _from, state) do
+    Logger.info("OnlinePageProducerConsumer received #{inspect(events)}")
+    events = Enum.filter(events, &Scraper.online?/1)
+    Logger.info("Online: #{inspect(events)}")
+    {:noreply, events, state}
+  end
+
+  def via(id) do
+    {:via, Registry, {ProducerConsumerRegistry, id}}
+  end
+end
+```
+
+```elixir
+defmodule OnlinePageConsumerSupervisor do
+  use ConsumerSupervisor
+  require Logger
+
+  def start_link(_args) do
+    ConsumerSupervisor.start_link(__MODULE__, :ok)
+  end
+
+  def init(:ok) do
+    Logger.info("PageConsumerSupervisor init (from scaling up)")
+
+    children = [
+      %{
+        id: OnlinePageConsumer,
+        start: {OnlinePageConsumer, :start_link, []},
+        restart: :transient
+      }
+    ]
+
+    opts = [
+      strategy: :one_for_one,
+      subscribe_to: [
+        {OnlinePageProducerConsumer.via("online_page_producer_consumer_1"), []},
+        {OnlinePageProducerConsumer.via("online_page_producer_consumer_2"), []}
+      ]
+    ]
+
+    ConsumerSupervisor.init(children, opts)
+  end
+end
+```
+
+```elixir
+defmodule OnlinePageConsumer do
+  require Logger
+
+  def start_link(event) do
+    Logger.info("OnlinePageConsumer #{inspect(self())} (scaling up) started with event #{event}")
+
+    Task.start_link(fn ->
+      Scraper.work()
+    end)
+  end
+end
+```
+
+```elixir
+Scraper.Application.start()
+```
+
+```elixir
+pages = ["page1", "page2", "page3", "page4", "page5"]
+
+PageProducer.scrape_pages(pages)
+PageProducer.scrape_pages(["page6", "page7"])
+```
+
+```elixir
+Scraper.Application.stop()
 ```
