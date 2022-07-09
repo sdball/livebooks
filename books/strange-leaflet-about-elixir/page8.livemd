@@ -332,4 +332,4 @@ And you can see why there's a final call to `:lists.reverse()`. The `Enum.into/2
 penultimate_result |> :lists.reverse()
 ```
 
-« [back to page 7](page7.livemd) || [turn to page 8]() »
+« [back to page 7](page7.livemd) || [turn to page 9]() »
