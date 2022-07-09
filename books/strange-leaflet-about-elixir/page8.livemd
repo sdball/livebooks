@@ -1,0 +1,335 @@
+<!-- vim: set syntax=markdown ft=markdown: -->
+
+# Stephen's Strange Leaflet about Elixir - Page 8
+
+```elixir
+Mix.install([
+  {:kino, "~> 0.6.1"}
+])
+```
+
+## If you don't have this open in Livebook you should
+
+[![Run in Livebook](https://livebook.dev/badge/v1/blue.svg)](https://livebook.dev/run?url=https%3A%2F%2Fgithub.com%2Fsdball%2Flivebooks%2Fblob%2Fmain%2Fbooks%2Fstrange-leaflet-about-elixir%2Fpage7.livemd)
+
+## Let's talk about Elixir loops
+
+You may be used to loop constructs like `while (i<=10)` and `for (i=0; i<=10; i++)`
+
+But Elixir doesn't have loops like that.
+
+What Elixir has instead is **recursion** and many standard library functions that nicely make recursive loops. The standard library functions are nice to use, but they don't do any magic that can't be done directly with recursion.
+
+Let's jump into the pool and write a recursive loop real quick.
+
+```elixir
+defmodule MissionControl do
+  def countdown(n) when n > 0 do
+    IO.puts(n)
+    countdown(n - 1)
+  end
+
+  def countdown(0) do
+    IO.puts("Blast off!!! 🚀")
+  end
+end
+```
+
+```elixir
+MissionControl.countdown(5)
+```
+
+Woo looping without loops!
+
+Occasionally writing the recursive functions directly can be more readable. But in practice you generally turn to the standard library functions first and only break out into recursive functions as a last resort.
+
+## Why is Elixir looping weird?
+
+To be clear, it's not **Elixir** specifically that has weird looping. It's functional languages.
+
+In imperative languages you have an iterator that you increment and use to access the data you're looping over. That means you're accessing/manipulating a collection in-place. That means the looping constructs don't return a value, they have side effects thanks to mutable data.
+
+In functional languages data is immutable. Instead of going through a collection with an iterator you pass a function over a collection. Each element in the collection goes through the function and returns a value and the operation as a whole returns a value as well.
+
+Confusing? Yeah let's look at an example.
+
+```elixir
+collection = 1..10
+```
+
+Ok we have a collection now. A range of numbers from 1 to 10. Right now it's actually a range primitive and not a list of discrete integers. We can convert the range into an actual list if we want to see all of the elements.
+
+```elixir
+Enum.into(collection, [])
+```
+
+## Elixir has an impressively expressive standard library
+
+This goal of turning an enumerable into a list is actually such a common case that there's an even more specific function in the standard library.
+
+```elixir
+Enum.to_list(collection)
+```
+
+You'll find that's a common theme in Elixir. If a function can be added that makes code more readable and doesn't conflict with existing functions or idioms then there's a good chance it could be added to the standard library.
+
+But let's focus on `Enum.into/2`: what's going on with that thing?
+
+## Back to how functions work on collections
+
+`Enum.into/2` is a good example of a functional approach to collections.
+
+There's an `Enum.into/2` function. That function accepts an enumerable collection as the first argument and a data structure that will be used to collect the information as the second argument.
+
+The `Enum.into/2` function has a return value: the enumerable (first argument) collected into the collectable (second argument). Data is still immutable. Nothing was modified in-place. The function passes over the collection and each element is appended to the collectable and passed to the next iteration of the function.
+
+Look see that `collection` is unchanged: it's still a range primitive.
+
+```elixir
+collection
+```
+
+What happened to that list that was returned from `Enum.into/2`? It's gone. Unless we assign a label to it.
+
+But let's drill down into `Enum.into/2`
+
+When collecting into a list that function essentially boils down to this
+
+<!-- livebook:{"force_markdown":true} -->
+
+```elixir
+reduce(enumerable, [], &[&1 | &2])
+```
+
+Which for a range specifically leads to this function
+
+<!-- livebook:{"force_markdown":true} -->
+
+```elixir
+def reduce(first..last//step, acc, fun) do
+  reduce_range(first, last, step, acc, fun)
+end
+```
+
+Which continues to
+
+<!-- livebook:{"force_markdown":true} -->
+
+```elixir
+defp reduce_range(first, last, step, acc, fun)
+      when step > 0 and first <= last
+      when step < 0 and first >= last do
+  reduce_range(first + step, last, step, fun.(first, acc), fun)
+end
+
+defp reduce_range(_first, _last, _step, acc, _fun) do
+  acc
+end
+```
+
+And finally that result is reversed. The `:lists` simply means we're calling an Erlang function which is zero cost because Elixir and Erlang are essentially the same langauge.
+
+<!-- livebook:{"force_markdown":true} -->
+
+```elixir
+:lists.reverse()
+```
+
+What's happening there?
+
+Well that pattern match of `first..last` is extracting the range start/end into those two separate variables.
+
+```elixir
+first..last = collection
+
+IO.inspect(first, label: :first)
+IO.inspect(last, label: :last)
+```
+
+How about that `def reduce(first..last//step, acc, fun) do` what's up with that?
+
+Let's find out!
+
+Because Elixir is Elixir it has great documentation for everything and this is no exception. You could head to https://hexdocs.pm and search for `//` to find the answer but here it is:
+
+https://hexdocs.pm/elixir/main/Kernel.html#..///3
+
+> `first..last//step` (since 1.12.0) (macro)
+> 
+> Creates a range from `first` to `last` with `step`.
+> 
+> See the Range module for more information.
+
+Neat let's see that in action.
+
+```elixir
+Enum.to_list(1..3//1)
+```
+
+```elixir
+Enum.to_list(0..20//5)
+```
+
+Ok, so what happens when we pattern match a `step` if we don't declare one on the range itself?
+
+```elixir
+first..last//step = 1..10
+
+IO.inspect(first, label: :first)
+IO.inspect(last, label: :last)
+IO.inspect(step, label: :step)
+```
+
+We get the default for a range! That's `1`
+
+And if we do have a `step` defined?
+
+```elixir
+first..last//step = 1..10//2
+
+IO.inspect(first, label: :first)
+IO.inspect(last, label: :last)
+IO.inspect(step, label: :step)
+```
+
+We get the `step` defined. Naturally.
+
+So that get's our tracing of `Enum.into/2` for a range going into list to this point
+
+<!-- livebook:{"force_markdown":true} -->
+
+```elixir
+defp reduce_range(first, last, step, acc, fun)
+      when step > 0 and first <= last
+      when step < 0 and first >= last do
+  reduce_range(first + step, last, step, fun.(first, acc), fun)
+end
+
+defp reduce_range(_first, _last, _step, acc, _fun) do
+  acc
+end
+```
+
+<!-- livebook:{"break_markdown":true} -->
+
+Hey look, we've gotten down to the low level recursive functions that the standard library is abstracting for us.
+
+It all leads to stepping through the bounds of the range, calling the given function with the current integer and accumulator, passing the result to the next step, and ultimately ending with the base case and returning the accumulator.
+
+That might be a little confusing to follow, so let's break it down and watch it do its work.
+
+Recall that this was an earlier call
+
+<!-- livebook:{"force_markdown":true} -->
+
+```elixir
+reduce(enumerable, [], &[&1 | &2])
+```
+
+That means our `acc` (accumulator) is `[]` and the `fun` is `&[&1 | &2]`
+
+## What's up with &[&1 | &2]?
+
+Yeah let's breakdown that `&[&1 | &2]` first. That's an Elixir shorthand for declaring an anonymous function like this
+
+<!-- livebook:{"force_markdown":true} -->
+
+```elixir
+def something(a, b) do
+  [a | b]
+end
+```
+
+Let's see that in action before we get to the recursion.
+
+```elixir
+something = &[&1 | &2]
+```
+
+```elixir
+otherthing = fn a, b ->
+  [a | b]
+end
+```
+
+If you pay close attention you'll notice that the identification of both of those functions is _identical_. That's because they both evaluate to the same value because they're the same function when parsed into the language. Elixir is smart enough not to waste resources storing the same function in two places.
+
+So what does that function do? Why it's list syntax to prepend the the first argument onto the list that's the second argument.
+
+```elixir
+something.(1, [])
+```
+
+```elixir
+otherthing.(1, [])
+```
+
+```elixir
+something.(2, [1])
+```
+
+Why are we prepending to the list? Because due to Elixir's design prepending an element to a list is always constant time while appending becomes slower as the list grows in size.
+
+If you're iteratively constructing a list in Elixir the best approach is to prepend your elements to the list and then reverse the list at the end.
+
+## Back to reducing the range into the accumulator
+
+Yeah let's put it all together and watch things happen.
+
+Here's what we'll work with
+
+* `first: 1`
+
+* `last: 10`
+
+* `step: 1`
+
+* `acc: []`
+
+* `fun: &[&1 | &2]`
+
+```elixir
+defmodule Strider do
+  def reduce_range(first, last, step, acc, fun)
+      when step > 0 and first <= last
+      when step < 0 and first >= last do
+    IO.inspect(first, label: :first)
+    IO.inspect(last, label: :last)
+    IO.inspect(step, label: :step)
+    IO.inspect(acc, label: :acc)
+    function_result = fun.(first, acc)
+    IO.inspect(function_result, label: "result of calling fun.(first, acc)")
+
+    IO.inspect(
+      "calling reduce_range(#{first + step}, #{last}, #{step}, #{inspect(function_result)}, fun)"
+    )
+
+    IO.puts("")
+    reduce_range(first + step, last, step, fun.(first, acc), fun)
+  end
+
+  def reduce_range(_first, _last, _step, acc, _fun) do
+    acc
+  end
+end
+```
+
+```elixir
+first = 1
+last = 10
+step = 1
+acc = []
+fun = &[&1 | &2]
+
+penultimate_result = Strider.reduce_range(first, last, step, acc, fun)
+```
+
+There we go! If you scroll through the calls you'll see how the "loop" in Elixir is going on a journey of discovery. Each step through the range carries everything needed to continue the journey without needing to refer back to anything from the past. That's an important bit because Elixir has tail call optimization but that can only work if each recursive call doesn't need to hold a reference to results from previous calls.
+
+And you can see why there's a final call to `:lists.reverse()`. The `Enum.into/2` function has not surprisingly done the correct approach of building up the list by prepending each new element. The final call reverses that result to get what a caller expects.
+
+```elixir
+penultimate_result |> :lists.reverse()
+```
+
+« [back to page 7](page7.livemd) || [turn to page 8]() »
