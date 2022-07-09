@@ -2,9 +2,7 @@
 
 # Stephen's Strange Leaflet about Elixir - Page 1
 
-## If you don't have this open in Livebook you should
-
-[![Run in Livebook](https://livebook.dev/badge/v1/blue.svg)](https://livebook.dev/run?url=https%3A%2F%2Fgithub.com%2Fsdball%2Flivebooks%2Fblob%2Fmain%2Fbooks%2Fstrange-leaflet-about-elixir%2Fpage1.livemd)
+There's a [Livebook livemd version](https://livebook.dev/run?url=https%3A%2F%2Fgithub.com%2Fsdball%2Flivebooks%2Fblob%2Fmain%2Fbooks%2Fstrange-leaflet-about-elixir%2Fpage1.livemd) where you can actually run code and follow along.
 
 ## > read leaflet
 

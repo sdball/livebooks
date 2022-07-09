@@ -109,7 +109,7 @@ Even if we directly call destructive looking `Map` functions our data is safe **
 
 ```elixir
 Map.delete(my_map, :critical)
-  ```
+```
 
 ```elixir
 my_map

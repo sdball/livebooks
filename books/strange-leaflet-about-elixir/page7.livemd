@@ -141,7 +141,7 @@ Patterns.echo(123)
 Patterns.echo("some string")
 ```
 
-A great thing about pattern matching functions is that you can write clear, specific functions for a specific type or value of argument. You can avoid litering `if` checks around your code: you can write exactly what you need for exactly those arguments!
+A great thing about pattern matching functions is that you can write clear, specific functions for a specific type or value of argument. You can avoid littering `if` checks around your code: you can write exactly what you need for exactly those arguments!
 
 ## Pattern matching return values
 
@@ -199,9 +199,11 @@ end
 
 ## Pattern matching messages
 
-Pattern matching messages is simply pattern matching function arguments, but the way Elixir's design of processes messages and pattern matching fit together is such an elegant design that it's nice to call out.
+Pattern matching messages is simply pattern matching function arguments, but the way Elixir's messages and pattern matching fit together is such an elegant design that it's nice to call out.
 
 When writing a GenServer or other interface for processes to communicate with messages you can write short, specific functions of each callback to handle exactly the message they're meant to handle. No need to have a huge `case` statement or defensive coding. You write what you need and no more. Freedom!
+
+In the following GenServer callbacks remember that the FIRST argument is the message being sent.
 
 ```elixir
 defmodule GameServer do
