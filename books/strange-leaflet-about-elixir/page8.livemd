@@ -194,7 +194,7 @@ IO.inspect(step, label: :step)
 
 We get the `step` defined. Naturally.
 
-So that get's our tracing of `Enum.into/2` for a range going into list to this point
+With that understanding our tracing of `Enum.into/2` for a range going into list can reach this point
 
 <!-- livebook:{"force_markdown":true} -->
 
@@ -230,7 +230,7 @@ That means our `acc` (accumulator) is `[]` and the `fun` is `&[&1 | &2]`
 
 ## What's up with &[&1 | &2]?
 
-Yeah let's breakdown that `&[&1 | &2]` first. That's an Elixir shorthand for declaring an anonymous function like this
+Yeah let's breakdown that `&[&1 | &2]` first. That's an Elixir shorthand for declaring an anonymous function. In this case the anonymous function has the same effect as this one written more verbosely.
 
 <!-- livebook:{"force_markdown":true} -->
 
@@ -274,9 +274,9 @@ If you're iteratively constructing a list in Elixir the best approach is to prep
 
 ## Back to reducing the range into the accumulator
 
-Yeah let's put it all together and watch things happen.
+Let's put it all together and watch things happen.
 
-Here's what we'll work with
+Here's what we'll start with
 
 * `first: 1`
 
