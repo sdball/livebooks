@@ -1,0 +1,64 @@
+# Programming Phoenix LiveView - CRC
+
+```elixir
+Mix.install([
+  {:kino, "~> 0.7.0"}
+])
+```
+
+## CRC: constructors, reducers, converters
+
+**Constructors** create a term of the core type from inputs
+
+**Reducers** transform a term of the core type to another term of that core type
+
+**Converters** convert the core type to another type
+
+```elixir
+defmodule Number do
+  # constructor
+  def new(string), do: Integer.parse(string) |> elem(0)
+  # reducer
+  def add(number, addend), do: number + addend
+  # converter
+  def to_string(number), do: Integer.to_string(number)
+end
+```
+
+```elixir
+list = [1, 2, 3]
+```
+
+```elixir
+total = Number.new("0")
+```
+
+```elixir
+reducer = &Number.add(&2, &1)
+```
+
+```elixir
+converter = &Number.to_string/1
+```
+
+```elixir
+Enum.reduce(list, total, reducer) |> converter.()
+```
+
+## Pipeline
+
+```elixir
+[first, second, third] = list
+```
+
+```elixir
+"0"
+|> Number.new()
+|> Number.add(first)
+|> Number.add(second)
+|> Number.add(third)
+|> Number.to_string()
+|> dbg()
+```
+
+## Untitled

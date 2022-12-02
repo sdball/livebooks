@@ -1,0 +1,83 @@
+# Programming Phoenix LiveView - Chapter 6
+
+## Explore demographics and ratings
+
+```elixir
+alias Pento.Accounts
+alias Pento.Survey
+alias Pento.Catalog
+```
+
+## Create user
+
+```elixir
+user_attrs = %{
+  email: "cassandra@grox.io",
+  password: "listen-to-me-plz"
+}
+```
+
+```elixir
+user =
+  case Accounts.get_user_by_email(user_attrs.email) do
+    user ->
+      user
+
+    nil ->
+      {:ok, user} = Accounts.register_user(user_attrs)
+      user
+  end
+```
+
+## Create demographics
+
+```elixir
+demographic_attrs = %{
+  user_id: user.id,
+  gender: "prefer not to say",
+  year_of_birth: 1989
+}
+```
+
+```elixir
+Survey.create_demographic(demographic_attrs)
+```
+
+## Create demographic for my user
+
+```elixir
+email = System.get_env("LB_USER_EMAIL")
+my_user = Pento.Accounts.get_user_by_email(email)
+attrs = %{gender: "male", year_of_birth: 1979, user_id: my_user.id}
+Survey.create_demographic(attrs)
+```
+
+## Create rating
+
+```elixir
+product = Pento.Catalog.get_product_by_sku("1234567")
+```
+
+```elixir
+rating_attrs = %{
+  user_id: user.id,
+  product_id: product.id,
+  stars: 5
+}
+```
+
+```elixir
+Survey.create_rating(rating_attrs)
+```
+
+## Use demographic query
+
+```elixir
+Survey.get_demographic_by_user(user)
+```
+
+## Use ratings query
+
+```elixir
+Catalog.list_products_with_user_ratings(user)
+```

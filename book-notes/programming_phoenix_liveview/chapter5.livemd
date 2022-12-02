@@ -1,0 +1,75 @@
+# Programming Phoenix LiveView - Chapter 5
+
+## Using Ecto changesets without Ecto data
+
+Note: This Livebook assumes it's connected to an `iex` session for the Pento project from the book.
+
+```elixir
+defmodule Player do
+  defstruct [:username, :age]
+end
+```
+
+```elixir
+player = %Player{}
+```
+
+We have a struct, easy peasy. But now how do we make it so that a changeset can work with that data? We need to describe the types of data in the struct.
+
+With Ecto-backed data we could depend on the database schema to provide that data. But with a struct primitive we need to provide that type data primitively as well.
+
+According to the docs for `Ecto.Changeset.cast/4`: `data` (the first argument) may be either a changeset, a schema struct or a `{data, types}` tuple
+
+```elixir
+types = %{username: :string, age: :integer}
+```
+
+```elixir
+attrs = %{username: "player1", age: 40}
+```
+
+```elixir
+changeset =
+  {player, types}
+  |> Ecto.Changeset.cast(attrs, [:username, :age])
+  |> Ecto.Changeset.validate_number(:age, greater_than: 18)
+```
+
+## Promo
+
+```elixir
+recipient = %Pento.Promo.Recipient{}
+attrs = %{first_name: "Stephen", email: "sdballgmail.com"}
+
+changeset = Pento.Promo.Recipient.changeset(recipient, attrs)
+```
+
+```elixir
+changeset.changes.email
+```
+
+## Live Uploads
+
+```elixir
+:code.priv_dir(:pento)
+```
+
+```elixir
+Path.join([:code.priv_dir(:pento), "static", "images"])
+```
+
+## Search
+
+```elixir
+sku_search = %Pento.Search.Sku{}
+attrs = %{sku: "1234567"}
+changeset = Pento.Search.build_search(sku_search, attrs)
+```
+
+```elixir
+product = Pento.Repo.get_by(Pento.Catalog.Product, sku: "1234567")
+```
+
+```elixir
+Pento.Catalog.get_product_by_sku!("1234567")
+```
