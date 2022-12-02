@@ -1,0 +1,105 @@
+# Advent of Code 2022 - Day 1
+
+```elixir
+Mix.install([
+  {:kino, "~> 0.7.0"}
+])
+```
+
+## Part 1
+
+The puzzle input is calorie totals separated by two newlines.
+
+For part 1 we are to find the largest calorie total from the given groups.
+
+```elixir
+sample_input = Kino.Input.textarea("Please paste the sample input")
+```
+
+```elixir
+sample_result =
+  sample_input
+  |> Kino.Input.read()
+  |> String.split("\n\n")
+  |> Enum.map(&String.split(&1, "\n"))
+  |> Enum.map(fn carrying ->
+    Enum.map(carrying, &String.to_integer/1)
+  end)
+  |> Enum.map(&Enum.sum/1)
+  |> Enum.max()
+```
+
+```elixir
+defmodule Day1.Part1 do
+  def max_calories(input) when is_binary(input) do
+    input
+    |> String.split("\n\n")
+    |> Enum.map(&String.split(&1, "\n"))
+    |> Enum.map(fn carrying ->
+      Enum.map(carrying, &String.to_integer/1)
+    end)
+    |> Enum.map(&Enum.sum/1)
+    |> Enum.max()
+  end
+
+  def max_calories(input) do
+    input
+    |> Kino.Input.read()
+    |> max_calories()
+  end
+end
+```
+
+```elixir
+day1_input = Kino.Input.textarea("Please paste the day 1 input")
+```
+
+```elixir
+Day1.Part1.max_calories(day1_input)
+```
+
+## Part 2
+
+For part 2 we are to find the sum of the three largest calorie totals from the given groups.
+
+```elixir
+defmodule Day1.Part2 do
+  def sum_calories(input, opts \\ [])
+
+  def sum_calories(input, opts) when is_map(input) do
+    input
+    |> Kino.Input.read()
+    |> sum_calories(opts)
+  end
+
+  def sum_calories(input, top: count) do
+    input
+    |> sum_input_groups()
+    |> Enum.sort(:desc)
+    |> Enum.take(count)
+    |> Enum.sum()
+  end
+
+  def sum_calories(input, bottom: count) do
+    input
+    |> sum_input_groups()
+    |> Enum.sort(:asc)
+    |> Enum.take(count)
+    |> Enum.sum()
+  end
+
+  defp sum_input_groups(input) do
+    input
+    |> String.split("\n\n")
+    |> Enum.map(&String.split(&1, "\n"))
+    |> Enum.map(fn carrying ->
+      Enum.map(carrying, &String.to_integer/1)
+    end)
+    |> Enum.map(&Enum.sum/1)
+  end
+end
+```
+
+```elixir
+Day1.Part2.sum_calories(day1_input, top: 3)
+```
