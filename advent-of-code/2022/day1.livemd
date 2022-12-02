@@ -13,15 +13,29 @@ The puzzle input is calorie totals separated by two newlines.
 For part 1 we are to find the largest calorie total from the given groups.
 
 ```elixir
-sample_input = Kino.Input.textarea("Please paste the sample input")
+sample_input = """
+1000
+2000
+3000
+
+4000
+
+5000
+6000
+
+7000
+8000
+9000
+
+10000
+"""
 ```
 
 ```elixir
 sample_result =
   sample_input
-  |> Kino.Input.read()
   |> String.split("\n\n")
-  |> Enum.map(&String.split(&1, "\n"))
+  |> Enum.map(&String.split(&1, "\n", trim: true))
   |> Enum.map(fn carrying ->
     Enum.map(carrying, &String.to_integer/1)
   end)
