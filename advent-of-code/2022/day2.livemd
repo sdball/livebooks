@@ -1,0 +1,381 @@
+# Advent of Code 2022 - Day 2
+
+```elixir
+Mix.install([
+  {:kino, "~> 0.7.0"}
+])
+```
+
+## Part 1
+
+In today's puzzle we are playing Rock, Paper, Scissors
+
+We have a strategy guide of what to play
+
+> …an encrypted strategy guide (your puzzle input) that they say will be sure to help you win. "The first column is what your opponent is going to play: A for Rock, B for Paper, and C for Scissors. The second column--" Suddenly, the Elf is called away to help with someone's tent.
+
+* A: rock
+* B: paper
+* C: scissors
+
+> The second column, you reason, must be what you should play in response: X for Rock, Y for Paper, and Z for Scissors. Winning every time would be suspicious, so the responses must have been carefully chosen.
+
+* X: rock
+* Y: paper
+* Z: scissors
+
+> The winner of the whole tournament is the player with the highest score. Your total score is the sum of your scores for each round. The score for a single round is the score for the shape you selected (1 for Rock, 2 for Paper, and 3 for Scissors) plus the score for the outcome of the round (0 if you lost, 3 if the round was a draw, and 6 if you won).
+
+Scoring
+
+* 1: rock (X)
+
+* 2: paper (Y)
+
+* 3: scissors (Z)
+
+* 0: lost
+
+* 3: draw
+
+* 6: win
+
+> Since you can't be sure if the Elf is trying to help you or trick you, you should calculate the score you would get if you were to follow the strategy guide.
+
+The puzzle sample input
+
+> ```
+> A Y
+> B X
+> C Z
+> ```
+> 
+> This strategy guide predicts and recommends the following:
+> 
+> * In the first round, your opponent will choose Rock (A), and you should choose Paper (Y). This ends in a win for you with a score of 8 (2 because you chose Paper + 6 because you won).
+> * In the second round, your opponent will choose Paper (B), and you should choose Rock (X). This ends in a loss for you with a score of 1 (1 + 0).
+> * The third round is a draw with both players choosing Scissors, giving you a score of 3 + 3 = 6.
+> 
+> In this example, if you were to follow the strategy guide, you would get a total score of `15` (8 + 1 + 6).
+
+So we're essentially expressing mathematical outcomes in the strategy guide and summing them up.
+
+`A Y` is a win for right so that's 6 and Y is 2 so `8`
+
+`B X` is a win for left so that's 0 and X is 1 so `1`
+
+`C Z` is a draw so that's 3 and Z is 3 so `6`
+
+```elixir
+sample_input = """
+A Y
+B X
+C Z
+"""
+```
+
+```elixir
+sample_result =
+  sample_input
+  |> String.split("\n", trim: true)
+  |> Enum.map(&String.split/1)
+```
+
+Ok cool, cool. There are only 9 possible combinations so we could just pattern match the scores.
+
+```
+A X
+A Y
+A Z
+B X
+B Y
+B Z
+C X
+C Y
+C Z
+```
+
+But lets decrypt into choices. e.g. `:rock, :rock`
+
+```elixir
+defmodule Day2.Part1.A do
+  def decrypt(character) when character in ["A", "X"] do
+    :rock
+  end
+
+  def decrypt(character) when character in ["B", "Y"] do
+    :paper
+  end
+
+  def decrypt(character) when character in ["C", "Z"] do
+    :scissors
+  end
+end
+```
+
+```elixir
+sample_result =
+  sample_input
+  |> String.split("\n", trim: true)
+  |> Enum.map(&String.split/1)
+  |> Enum.map(fn match ->
+    Enum.map(match, &Day2.Part1.A.decrypt/1)
+  end)
+```
+
+Cool, cool. Let's translate decrypted choices into values.
+
+```elixir
+defmodule Day2.Part1.B do
+  def decrypt(character) when character in ["A", "X"], do: :rock
+  def decrypt(character) when character in ["B", "Y"], do: :paper
+  def decrypt(character) when character in ["C", "Z"], do: :scissors
+
+  def value(:rock), do: 1
+  def value(:paper), do: 2
+  def value(:scissors), do: 3
+
+  def value(character) do
+    character
+    |> decrypt()
+    |> value()
+  end
+end
+```
+
+```elixir
+sample_result =
+  sample_input
+  |> String.split("\n", trim: true)
+  |> Enum.map(&String.split/1)
+  |> Enum.map(fn match ->
+    Enum.map(match, &Day2.Part1.B.value/1)
+  end)
+```
+
+Ok cool cool, let's translate matches into scores.
+
+```elixir
+defmodule Day2.Part1.C do
+  def decrypt(character) when character in ["A", "X"], do: :rock
+  def decrypt(character) when character in ["B", "Y"], do: :paper
+  def decrypt(character) when character in ["C", "Z"], do: :scissors
+
+  def value(:rock), do: 1
+  def value(:paper), do: 2
+  def value(:scissors), do: 3
+
+  def value(character) do
+    character
+    |> decrypt()
+    |> value()
+  end
+
+  @doc """
+  Score a match of rock, paper, scissors
+
+  Points are based on the right-side value.
+
+  * 0 for a loss
+  * 3 for a draw
+  * 6 for a win
+
+  rock beats scissors
+  scissors beats paper
+  paper beats rock
+  """
+  def score([a, b]) when a == b, do: 3
+  def score([:rock, :scissors]), do: 0
+  def score([:rock, :paper]), do: 6
+  def score([:paper, :rock]), do: 0
+  def score([:paper, :scissors]), do: 6
+  def score([:scissors, :rock]), do: 6
+  def score([:scissors, :paper]), do: 0
+
+  def total([a, b]) do
+    a = decrypt(a)
+    b = decrypt(b)
+
+    score([a, b]) + value(b)
+  end
+end
+```
+
+```elixir
+sample_result =
+  sample_input
+  |> String.split("\n", trim: true)
+  |> Enum.map(&String.split/1)
+  |> Enum.map(fn match ->
+    Day2.Part1.C.total(match)
+  end)
+  |> Enum.sum()
+```
+
+Cool, that's the sample result done.
+
+```elixir
+puzzle_input = Kino.Input.textarea("Please paste your puzzle input")
+```
+
+```elixir
+puzzle_input
+|> Kino.Input.read()
+|> String.split("\n", trim: true)
+|> Enum.map(&String.split/1)
+|> Enum.map(fn match ->
+  Day2.Part1.C.total(match)
+end)
+|> Enum.sum()
+```
+
+## Part 2
+
+For part two we find that the second column is NOT what we play, but instead
+
+> the second column says how the round needs to end: X means you need to lose, Y means you need to end the round in a draw, and Z means you need to win
+> 
+> The total score is still calculated in the same way, but now you need to figure out what shape to choose so the round ends as indicated. The example above now goes like this:
+> 
+> * In the first round, your opponent will choose Rock (A), and you need the round to end in a draw (Y), so you also choose Rock. This gives you a score of 1 + 3 = 4.
+> * In the second round, your opponent will choose Paper (B), and you choose Rock so you lose (X) with a score of 1 + 0 = 1.
+> * In the third round, you will defeat your opponent's Scissors with Rock for a score of 1 + 6 = 7.
+>   Now that you're correctly decrypting the ultra top secret strategy guide, you would get a total score of `12`.
+
+```elixir
+defmodule Day2.Part2.A do
+  def decrypt("A"), do: :rock
+  def decrypt("B"), do: :paper
+  def decrypt("C"), do: :scissors
+  def decrypt("X"), do: :lose
+  def decrypt("Y"), do: :draw
+  def decrypt("Z"), do: :win
+end
+```
+
+```elixir
+sample_input
+|> String.split("\n", trim: true)
+|> Enum.map(&String.split/1)
+|> Enum.map(fn match ->
+  Enum.map(match, &Day2.Part2.A.decrypt/1)
+end)
+```
+
+Cool, cool. So if we translate the `:draw` `:lose` `:win` instructions to the right shape then we can reuse our existing code to calculate the result.
+
+Probably could've done better to actually encore the rules of what beats what but eh we can pattern match this!
+
+```elixir
+defmodule Day2.Part2.B do
+  def decrypt("A"), do: :rock
+  def decrypt("B"), do: :paper
+  def decrypt("C"), do: :scissors
+  def decrypt("X"), do: :lose
+  def decrypt("Y"), do: :draw
+  def decrypt("Z"), do: :win
+
+  def throw([a, :draw]), do: a
+  def throw([:rock, :lose]), do: :scissors
+  def throw([:rock, :win]), do: :paper
+  def throw([:paper, :lose]), do: :rock
+  def throw([:paper, :win]), do: :scissors
+  def throw([:scissors, :lose]), do: :paper
+  def throw([:scissors, :win]), do: :rock
+end
+```
+
+```elixir
+sample_input
+|> String.split("\n", trim: true)
+|> Enum.map(&String.split/1)
+|> Enum.map(fn match ->
+  Enum.map(match, &Day2.Part2.B.decrypt/1)
+end)
+|> Enum.map(fn match = [opponent, _outcome] ->
+  [opponent, Day2.Part2.B.throw(match)]
+end)
+```
+
+```elixir
+defmodule Day2.Part2.C do
+  def decrypt("A"), do: :rock
+  def decrypt("B"), do: :paper
+  def decrypt("C"), do: :scissors
+  def decrypt("X"), do: :lose
+  def decrypt("Y"), do: :draw
+  def decrypt("Z"), do: :win
+
+  def throw([a, :draw]), do: a
+  def throw([:rock, :lose]), do: :scissors
+  def throw([:rock, :win]), do: :paper
+  def throw([:paper, :lose]), do: :rock
+  def throw([:paper, :win]), do: :scissors
+  def throw([:scissors, :lose]), do: :paper
+  def throw([:scissors, :win]), do: :rock
+
+  def value(:rock), do: 1
+  def value(:paper), do: 2
+  def value(:scissors), do: 3
+
+  def value(character) do
+    character
+    |> decrypt()
+    |> value()
+  end
+
+  @doc """
+  Score a match of rock, paper, scissors
+
+  Points are based on the right-side value.
+
+  * 0 for a loss
+  * 3 for a draw
+  * 6 for a win
+
+  rock beats scissors
+  scissors beats paper
+  paper beats rock
+  """
+  def score([a, b]) when a == b, do: 3
+  def score([:rock, :scissors]), do: 0
+  def score([:rock, :paper]), do: 6
+  def score([:paper, :rock]), do: 0
+  def score([:paper, :scissors]), do: 6
+  def score([:scissors, :rock]), do: 6
+  def score([:scissors, :paper]), do: 0
+
+  def total([a, b]) do
+    score([a, b]) + value(b)
+  end
+end
+```
+
+```elixir
+sample_input
+|> String.split("\n", trim: true)
+|> Enum.map(&String.split/1)
+|> Enum.map(fn match ->
+  Enum.map(match, &Day2.Part2.C.decrypt/1)
+end)
+|> Enum.map(fn match = [opponent, _outcome] ->
+  [opponent, Day2.Part2.C.throw(match)]
+end)
+|> Enum.map(&Day2.Part2.C.total/1)
+|> Enum.sum()
+```
+
+```elixir
+puzzle_input
+|> Kino.Input.read()
+|> String.split("\n", trim: true)
+|> Enum.map(&String.split/1)
+|> Enum.map(fn match ->
+  Enum.map(match, &Day2.Part2.C.decrypt/1)
+end)
+|> Enum.map(fn match = [opponent, _outcome] ->
+  [opponent, Day2.Part2.C.throw(match)]
+end)
+|> Enum.map(&Day2.Part2.C.total/1)
+|> Enum.sum()
+```
