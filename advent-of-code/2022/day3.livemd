@@ -1,0 +1,233 @@
+# Advent of Code 2022 - Day 3
+
+```elixir
+Mix.install([
+  {:kino, "~> 0.7.0"}
+])
+```
+
+## Part 1
+
+Each line of input in today's puzzle is the contents of a rucksack.
+
+Each rucksack has two compartments.
+
+Each half of an input line is the contents of a rucksack compartment.
+
+Each letter of an input is a type of item.
+
+Each compartment is supposed to hold all items of one type (i.e. no type should be split between both compartments.)
+
+For each line: find the type that is in both compartments.
+
+Each type is also assigned a score (priority). Find each type that's incorrectly in both compartments and sum up their scores.
+
+```elixir
+sample_input = """
+vJrwpWtwJgWrhcsFMMfFFhFp
+jqHRNqRjqzjGDLGLrsFMfFZSrLrFZsSL
+PmmdzqPrVvPwwTWBwg
+wMqvLMZHhHMvwLHjbvcjnnSBnvTQFn
+ttgJtRGJQctTZtZT
+CrZsJsPPZsGzwwsLwLmpwMDw
+"""
+```
+
+```elixir
+sample_input
+|> String.split("\n", trim: true)
+|> Enum.map(&String.split(&1, "", trim: true))
+|> Enum.map(fn rucksack ->
+  compartment_length = (Enum.count(rucksack) / 2) |> round()
+  Enum.split(rucksack, compartment_length)
+end)
+|> Enum.map(fn {compartment1, compartment2} ->
+  [compartment1, compartment2] |> Enum.map(&MapSet.new/1)
+end)
+|> Enum.map(fn [contents1, contents2] ->
+  MapSet.intersection(contents1, contents2)
+end)
+```
+
+Ok cool, cool. `MapSet` makes this pretty straightforward. Now let's translate letters to priorities.
+
+* Lowercase item types a through z have priorities 1 through 26.
+* Uppercase item types A through Z have priorities 27 through 52.
+
+```elixir
+[
+  a: ?a - 96,
+  b: ?b - 96,
+  c: ?b - 96,
+  x: ?x - 96,
+  y: ?y - 96,
+  z: ?z - 96,
+  A: ?A - 38,
+  B: ?B - 38,
+  C: ?C - 38,
+  X: ?X - 38,
+  Y: ?Y - 38,
+  Z: ?Z - 38
+]
+```
+
+```elixir
+defmodule Day3.Part1.A do
+  def rucksacks(input) do
+    input
+    |> String.split("\n", trim: true)
+    |> Enum.map(&String.split(&1, "", trim: true))
+  end
+
+  def compartments(rucksacks) do
+    rucksacks
+    |> Enum.map(fn rucksack ->
+      compartment_length = (Enum.count(rucksack) / 2) |> round()
+      Enum.split(rucksack, compartment_length)
+    end)
+  end
+
+  def common_types(rucksacks) do
+    rucksacks
+    |> Enum.map(fn {compartment1, compartment2} ->
+      [compartment1, compartment2] |> Enum.map(&MapSet.new/1)
+    end)
+    |> Enum.map(fn [contents1, contents2] ->
+      MapSet.intersection(contents1, contents2)
+      |> Enum.into([])
+      |> Enum.at(0)
+    end)
+  end
+
+  def priorities(characters) do
+    characters
+    |> Enum.map(&String.to_charlist/1)
+    |> Enum.map(&hd/1)
+    |> Enum.map(&priority/1)
+  end
+
+  def priority(character) when character in ?a..?z do
+    character - 96
+  end
+
+  def priority(character) when character in ?A..?Z do
+    character - 38
+  end
+
+  def total(priorities) do
+    Enum.sum(priorities)
+  end
+end
+```
+
+```elixir
+sample_input
+|> Day3.Part1.A.rucksacks()
+|> Day3.Part1.A.compartments()
+|> Day3.Part1.A.common_types()
+|> Day3.Part1.A.priorities()
+|> Day3.Part1.A.total()
+```
+
+That matches the expectations for the sample input. Let's try the puzzle!
+
+```elixir
+puzzle_input = Kino.Input.textarea("Please paste your puzzle input")
+```
+
+```elixir
+puzzle_input
+|> Kino.Input.read()
+|> Day3.Part1.A.rucksacks()
+|> Day3.Part1.A.compartments()
+|> Day3.Part1.A.common_types()
+|> Day3.Part1.A.priorities()
+|> Day3.Part1.A.total()
+```
+
+## Part 2
+
+Another issue!
+
+For safety, the Elves are divided into groups of three.
+
+Every Elf carries a badge that identifies their group.
+
+Within each group of three Elves, the badge is the **only item type carried by all three Elves**.
+
+The only way to tell which item type is the right one is by finding the one item type that is common between all three Elves in each group.
+
+Every set of three lines in your list corresponds to a single group, but each group can have a different badge item type.
+
+In the sample input the first group of three has the common type `r` and the second group has the common type `Z`. The badge types are still prioritized the same way.
+
+Find the badge for each group of three, determine the priority of their type, and sum the badge priorities.
+
+```elixir
+defmodule Day3.Part2.A do
+  def rucksacks(input) do
+    input
+    |> String.split("\n", trim: true)
+    |> Enum.map(&String.split(&1, "", trim: true))
+  end
+
+  def group(rucksacks) do
+    rucksacks
+    |> Enum.chunk_every(3)
+  end
+
+  def badges(groups) do
+    groups
+    |> Enum.map(fn group ->
+      Enum.map(group, &MapSet.new/1)
+    end)
+    |> Enum.map(fn [elf1, elf2, elf3] ->
+      elf1
+      |> MapSet.intersection(elf2)
+      |> MapSet.intersection(elf3)
+      |> Enum.into([])
+      |> Enum.at(0)
+    end)
+  end
+
+  def priorities(characters) do
+    characters
+    |> Enum.map(&String.to_charlist/1)
+    |> Enum.map(&hd/1)
+    |> Enum.map(&priority/1)
+  end
+
+  def priority(character) when character in ?a..?z do
+    character - 96
+  end
+
+  def priority(character) when character in ?A..?Z do
+    character - 38
+  end
+
+  def total(priorities) do
+    Enum.sum(priorities)
+  end
+end
+```
+
+```elixir
+sample_input
+|> Day3.Part2.A.rucksacks()
+|> Day3.Part2.A.group()
+|> Day3.Part2.A.badges()
+|> Day3.Part2.A.priorities()
+|> Day3.Part2.A.total()
+```
+
+Ok, that matches the sample puzzle requirements.
+
+```elixir
+puzzle_input
+|> Kino.Input.read()
+|> Day3.Part2.A.rucksacks()
+|> Day3.Part2.A.group()
+|> Day3.Part2.A.badges()
+|> Day3.Part2.A.priorities()
+|> Day3.Part2.A.total()
+```
