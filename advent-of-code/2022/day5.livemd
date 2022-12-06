@@ -1,0 +1,571 @@
+# Advent of Code - Day 5
+
+```elixir
+Mix.install([
+  {:kino, "~> 0.8.0"}
+])
+```
+
+## Part 1
+
+> Supplies are stored in stacks of marked **crates**, but because the needed supplies are buried under many other crates, the crates need to be **rearranged**.
+> 
+> The ship has a giant cargo crane capable of moving crates between stacks.
+> 
+> To ensure none of the crates get crushed or fall over, the crane operator will rearrange them in a series of carefully-planned steps. After the crates are rearranged, the desired crates will be at the top of each stack.
+
+Eyyy are we doing towers of Hanoi?
+
+> They have a drawing of the starting stacks of crates and the rearrangement procedure (your puzzle input).
+> 
+> ```
+>     [D]    
+> [N] [C]    
+> [Z] [M] [P]
+>  1   2   3 
+> 
+> move 1 from 2 to 1
+> move 3 from 1 to 3
+> move 2 from 2 to 1
+> move 1 from 1 to 2
+> ```
+
+Kind of?
+
+> In each step of the procedure, a quantity of crates is moved from one stack to a different stack.
+
+`move 1 from 2 to 1`
+
+> In the first step of the above rearrangement procedure, one crate is moved from stack 2 to stack 1, resulting in this configuration:
+> 
+> ```
+> [D]        
+> [N] [C]    
+> [Z] [M] [P]
+>  1   2   3 
+> ```
+
+`move 3 from 1 to 3`
+
+> In the second step, three crates are moved from stack 1 to stack 3. Crates are moved one at a time, so the first crate to be moved (D) ends up below the second and third crates:
+> 
+> ```
+>         [Z]
+>         [N]
+>     [C] [D]
+>     [M] [P]
+>  1   2   3
+> ```
+
+`move 2 from 2 to 1`
+
+> Then, both crates are moved from stack 2 to stack 1. Again, because crates are moved one at a time, crate C ends up below crate M
+> 
+> ```
+>         [Z]
+>         [N]
+> [M]     [D]
+> [C]     [P]
+>  1   2   3
+> ```
+
+`move 1 from 1 to 2`
+
+> Finally, one crate is moved from stack 1 to stack 2:
+> 
+> ```
+>         [Z]
+>         [N]
+>         [D]
+> [C] [M] [P]
+>  1   2   3
+> ```
+
+> The Elves just need to know **which crate will end up on top of each stack**; in this example, the top crates are `C` in stack 1, `M` in stack 2, and `Z` in stack 3, so you should combine these together and give the Elves the message `CMZ`.
+
+Ok! Parsing this puzzle input will be the first thing. We have a starting configuration and a set of instructions.
+
+## Parsing the input
+
+```elixir
+sample_input = """
+    [D]    
+[N] [C]    
+[Z] [M] [P]
+ 1   2   3 
+
+move 1 from 2 to 1
+move 3 from 1 to 3
+move 2 from 2 to 1
+move 1 from 1 to 2
+"""
+```
+
+```elixir
+defmodule Step do
+  defstruct [:action, :count, :start, :destination]
+
+  def build(action, count, start, destination) do
+    %Step{
+      action: action,
+      count: String.to_integer(count),
+      start: String.to_integer(start),
+      destination: String.to_integer(destination)
+    }
+  end
+end
+```
+
+```elixir
+defmodule Day5.Part1.A do
+  def starting_stacks(input) do
+    input
+    |> String.split("\n\n")
+    |> Enum.at(0)
+  end
+
+  def procedure(input) do
+    input
+    |> String.split("\n\n")
+    |> Enum.at(1)
+    |> String.split("\n", trim: true)
+    |> Enum.map(&parse_step/1)
+  end
+
+  defp parse_step(step) do
+    step
+    |> String.split()
+    |> then(fn ["move", count, "from", start, "to", destination] ->
+      Step.build(:move, count, start, destination)
+    end)
+  end
+end
+```
+
+```elixir
+Day5.Part1.A.starting_stacks(sample_input)
+|> String.split("\n", trim: true)
+|> Enum.filter(&String.contains?(&1, "["))
+|> Enum.reverse()
+|> Enum.map(fn slice ->
+  slice
+  |> String.split(~r//, trim: true)
+  |> Enum.chunk_by(fn char ->
+    char == " "
+  end)
+  |> Enum.flat_map(&Enum.chunk_every(&1, 4))
+  |> Enum.reject(fn
+    [" "] -> true
+    _ -> false
+  end)
+end)
+|> Enum.map(fn slice ->
+  slice |> Enum.with_index(1)
+end)
+|> Enum.map(fn slice ->
+  slice
+  |> Enum.filter(fn {chars, _index} ->
+    Enum.any?(chars, fn char ->
+      char == "["
+    end)
+  end)
+end)
+|> Enum.map(fn slice ->
+  slice
+  |> Enum.map(fn {["[", char, "]"], index} ->
+    {char, index}
+  end)
+end)
+|> Enum.flat_map(& &1)
+|> Enum.reduce(%{}, fn {container, stack}, acc ->
+  new_stack = Map.get(acc, stack, []) ++ [container]
+  Map.put(acc, stack, new_stack)
+end)
+|> dbg()
+```
+
+At long last, the stacks parsed into their arbitrary stacks in order.
+
+The procedure is comparatively easy!
+
+```elixir
+Day5.Part1.A.procedure(sample_input)
+```
+
+## Part 1 (again)
+
+Now that we can parse, let's get all that into a module.
+
+```elixir
+defmodule Day5.Part1.B do
+  def starting_stacks(input) do
+    input
+    |> String.split("\n\n")
+    |> Enum.at(0)
+    |> String.split("\n", trim: true)
+    |> Enum.filter(&String.contains?(&1, "["))
+    |> Enum.reverse()
+    |> Enum.map(fn slice ->
+      slice
+      |> String.split(~r//, trim: true)
+      |> Enum.chunk_by(fn char ->
+        char == " "
+      end)
+      |> Enum.flat_map(&Enum.chunk_every(&1, 4))
+      |> Enum.reject(fn
+        [" "] -> true
+        _ -> false
+      end)
+    end)
+    |> Enum.map(fn slice ->
+      slice |> Enum.with_index(1)
+    end)
+    |> Enum.map(fn slice ->
+      slice
+      |> Enum.filter(fn {chars, _index} ->
+        Enum.any?(chars, fn char ->
+          char == "["
+        end)
+      end)
+    end)
+    |> Enum.map(fn slice ->
+      slice
+      |> Enum.map(fn {["[", char, "]"], index} ->
+        {char, index}
+      end)
+    end)
+    |> Enum.flat_map(& &1)
+    |> Enum.reduce(%{}, fn {container, stack}, acc ->
+      new_stack = Map.get(acc, stack, []) ++ [container]
+      Map.put(acc, stack, new_stack)
+    end)
+  end
+
+  def procedure(input) do
+    input
+    |> String.split("\n\n")
+    |> Enum.at(1)
+    |> String.split("\n", trim: true)
+    |> Enum.map(&parse_step/1)
+  end
+
+  defp parse_step(step) do
+    step
+    |> String.split()
+    |> then(fn ["move", count, "from", start, "to", destination] ->
+      Step.build(:move, count, start, destination)
+    end)
+  end
+end
+```
+
+```elixir
+Day5.Part1.B.starting_stacks(sample_input)
+```
+
+```elixir
+Day5.Part1.B.procedure(sample_input)
+```
+
+Now let's translate steps into transforms of the stacks.
+
+```elixir
+stacks = Day5.Part1.B.starting_stacks(sample_input)
+```
+
+```elixir
+# move 1 from 2 to 1
+
+{container, new_stack2} = stacks[2] |> List.pop_at(-1)
+new_stack1 = stacks[1] ++ [container]
+
+%{stacks | 1 => new_stack1, 2 => new_stack2}
+```
+
+```elixir
+step = %Step{action: :move, count: 1, start: 2, destination: 1}
+
+stacks =
+  1..1
+  |> Enum.reduce(stacks, fn _count, new_stacks ->
+    {container, new_from} = stacks[step.start] |> List.pop_at(-1)
+    new_to = stacks[step.destination] ++ [container]
+    %{new_stacks | step.start => new_from, step.destination => new_to}
+  end)
+```
+
+```elixir
+step = %Step{action: :move, count: 3, start: 1, destination: 3}
+
+stack =
+  1..3
+  |> Enum.reduce(stacks, fn _count, acc ->
+    {container, new_from} = acc[step.start] |> List.pop_at(-1)
+    new_to = acc[step.destination] ++ [container]
+    dbg(acc[step.start])
+    dbg(container)
+    dbg(new_from)
+    dbg(new_to)
+    %{acc | step.start => new_from, step.destination => new_to}
+  end)
+```
+
+Ok, that should be movement down. Now to make it a module and apply all the steps.
+
+```elixir
+defmodule Day5.Part1.C do
+  def starting_stacks(input) do
+    input
+    |> String.split("\n\n")
+    |> Enum.at(0)
+    |> String.split("\n", trim: true)
+    |> Enum.filter(&String.contains?(&1, "["))
+    |> Enum.reverse()
+    |> Enum.map(fn slice ->
+      slice
+      |> String.split(~r//, trim: true)
+      |> Enum.chunk_by(fn char ->
+        char == " "
+      end)
+      |> Enum.flat_map(&Enum.chunk_every(&1, 4))
+      |> Enum.reject(fn
+        [" "] -> true
+        _ -> false
+      end)
+    end)
+    |> Enum.map(fn slice ->
+      slice |> Enum.with_index(1)
+    end)
+    |> Enum.map(fn slice ->
+      slice
+      |> Enum.filter(fn {chars, _index} ->
+        Enum.any?(chars, fn char ->
+          char == "["
+        end)
+      end)
+    end)
+    |> Enum.map(fn slice ->
+      slice
+      |> Enum.map(fn {["[", char, "]"], index} ->
+        {char, index}
+      end)
+    end)
+    |> Enum.flat_map(& &1)
+    |> Enum.reduce(%{}, fn {container, stack}, acc ->
+      new_stack = Map.get(acc, stack, []) ++ [container]
+      Map.put(acc, stack, new_stack)
+    end)
+  end
+
+  def procedure(input) do
+    input
+    |> String.split("\n\n")
+    |> Enum.at(1)
+    |> String.split("\n", trim: true)
+    |> Enum.map(&parse_step/1)
+  end
+
+  def apply(stacks, steps) do
+    steps
+    |> Enum.reduce(stacks, fn step, acc ->
+      apply_step(acc, step)
+    end)
+  end
+
+  def apply_step(stacks, step) do
+    1..step.count
+    |> Enum.reduce(stacks, fn _count, acc ->
+      {container, new_from} = acc[step.start] |> List.pop_at(-1)
+      new_to = acc[step.destination] ++ [container]
+      %{acc | step.start => new_from, step.destination => new_to}
+    end)
+  end
+
+  def top_containers(stacks) do
+    1..Enum.max(Map.keys(stacks))
+    |> Enum.map(fn stack ->
+      stacks[stack] |> Enum.at(-1)
+    end)
+    |> Enum.join()
+  end
+
+  defp parse_step(step) do
+    step
+    |> String.split()
+    |> then(fn ["move", count, "from", start, "to", destination] ->
+      Step.build(:move, count, start, destination)
+    end)
+  end
+end
+```
+
+```elixir
+sample_input
+|> Day5.Part1.C.starting_stacks()
+|> Day5.Part1.C.apply(Day5.Part1.C.procedure(sample_input))
+|> Day5.Part1.C.top_containers()
+```
+
+Ok! That's the answer for the sample input at least. No tricks!
+
+Does it work for puzzle input?
+
+```elixir
+puzzle_input = Kino.Input.textarea("Paste your puzzle input")
+```
+
+```elixir
+puzzle_input = Kino.Input.read(puzzle_input)
+
+puzzle_input
+|> Day5.Part1.C.starting_stacks()
+|> Day5.Part1.C.apply(Day5.Part1.C.procedure(puzzle_input))
+|> Day5.Part1.C.top_containers()
+```
+
+Hooray! I calculate the right answer.
+
+## Part 2
+
+> As you watch the crane operator expertly rearrange the crates, you notice the process isn't following your prediction.
+
+The twist? The crane has "the ability to pick up and move multiple crates at once"
+
+Moving a single crate works as we've already determined.
+
+BUT moving multiple crates means that all the crates are picked up at once and keep their same order.
+
+Ok, cool cool. Instead of doing a transform of many `pop_at(-1)` operations we can make single operations to get the whole movement at once.
+
+```elixir
+defmodule Day5.Part2.A do
+  def starting_stacks(input) do
+    input
+    |> String.split("\n\n")
+    |> Enum.at(0)
+    |> String.split("\n", trim: true)
+    |> Enum.filter(&String.contains?(&1, "["))
+    |> Enum.reverse()
+    |> Enum.map(fn slice ->
+      slice
+      |> String.split(~r//, trim: true)
+      |> Enum.chunk_by(fn char ->
+        char == " "
+      end)
+      |> Enum.flat_map(&Enum.chunk_every(&1, 4))
+      |> Enum.reject(fn
+        [" "] -> true
+        _ -> false
+      end)
+    end)
+    |> Enum.map(fn slice ->
+      slice |> Enum.with_index(1)
+    end)
+    |> Enum.map(fn slice ->
+      slice
+      |> Enum.filter(fn {chars, _index} ->
+        Enum.any?(chars, fn char ->
+          char == "["
+        end)
+      end)
+    end)
+    |> Enum.map(fn slice ->
+      slice
+      |> Enum.map(fn {["[", char, "]"], index} ->
+        {char, index}
+      end)
+    end)
+    |> Enum.flat_map(& &1)
+    |> Enum.reduce(%{}, fn {container, stack}, acc ->
+      new_stack = Map.get(acc, stack, []) ++ [container]
+      Map.put(acc, stack, new_stack)
+    end)
+  end
+
+  def procedure(input) do
+    input
+    |> String.split("\n\n")
+    |> Enum.at(1)
+    |> String.split("\n", trim: true)
+    |> Enum.map(&parse_step/1)
+  end
+
+  def apply(stacks, steps) do
+    steps
+    |> Enum.reduce(stacks, fn step, acc ->
+      apply_step(acc, step)
+    end)
+  end
+
+  def apply_step(stacks, step) do
+    moving = Enum.take(stacks[step.start], -step.count)
+    new_from = Enum.take(stacks[step.start], Enum.count(stacks[step.start]) - step.count)
+    new_to = stacks[step.destination] ++ moving
+    %{stacks | step.start => new_from, step.destination => new_to}
+  end
+
+  def top_containers(stacks) do
+    1..Enum.max(Map.keys(stacks))
+    |> Enum.map(fn stack ->
+      stacks[stack] |> Enum.at(-1)
+    end)
+    |> Enum.join()
+  end
+
+  defp parse_step(step) do
+    step
+    |> String.split()
+    |> then(fn ["move", count, "from", start, "to", destination] ->
+      Step.build(:move, count, start, destination)
+    end)
+  end
+end
+```
+
+```elixir
+stacks = Day5.Part2.A.starting_stacks(sample_input)
+```
+
+```elixir
+step = %Step{action: :move, count: 3, start: 2, destination: 3}
+```
+
+This should end up with
+
+<!-- livebook:{"force_markdown":true} -->
+
+```elixir
+%{1 => ["Z", "N"], 2 => [], 3 => ["P", "M", "C", "D"]}
+```
+
+Instead of the original algorithm which would have been
+
+<!-- livebook:{"force_markdown":true} -->
+
+```elixir
+%{1 => ["Z", "N"], 2 => [], 3 => ["P", "D", "C", "M"]}
+```
+
+```elixir
+Day5.Part2.A.apply_step(stacks, step)
+```
+
+Cool, cool. Let's check against the sample data.
+
+```elixir
+sample_input
+|> Day5.Part2.A.starting_stacks()
+|> Day5.Part2.A.apply(Day5.Part1.C.procedure(sample_input))
+|> Day5.Part2.A.top_containers()
+```
+
+Ok, that's what we expect for part 2 sample input. Now for the puzzle input!
+
+(Remember we've already parsed `puzzle_input` through `Kino.read/1`)
+
+```elixir
+puzzle_input
+|> Day5.Part2.A.starting_stacks()
+|> Day5.Part2.A.apply(Day5.Part1.C.procedure(puzzle_input))
+|> Day5.Part2.A.top_containers()
+```
