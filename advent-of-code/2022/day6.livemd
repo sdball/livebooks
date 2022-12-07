@@ -1,0 +1,246 @@
+# Advent of Code 2022 - Day 6
+
+```elixir
+Mix.install([
+  {:kino, "~> 0.8.0"}
+])
+```
+
+## Part 1
+
+> As you move through the dense undergrowth, one of the Elves gives you a handheld device. He says that it has many fancy features, but the most important one to set up right now is the communication system.
+
+Oooo a device.
+
+> To be able to communicate with the Elves, the device needs to lock on to their signal. The signal is a series of seemingly-random characters that the device receives one at a time.
+
+I am here for it.
+
+> To fix the communication system, you need to add a subroutine to the device that detects a start-of-packet marker in the datastream. In the protocol being used by the Elves, the start of a packet is indicated by a sequence of four characters that are all different.
+
+Yesssss let's scan some signals.
+
+> The device will send your subroutine a datastream buffer (your puzzle input); your subroutine needs to identify the first position where the four most recently received characters were all different. Specifically, it needs to report the number of characters from the beginning of the buffer to the end of the first such four-character marker.
+
+Take note: count to the **end** of the marker.
+
+Ok, let's have Elixir's powerful `Enum` and pattern matching make short work of this.
+
+> Sample input: `mjqjpqmgbljsphdztnvjfqwrcgsmlb`
+
+> The first time a marker appears is after the seventh character arrives. Once it does, the last four characters received are `jpqm`, which are all different. In this case, your subroutine should report the value `7`, because the first start-of-packet marker is complete after 7 characters have been processed.
+
+```elixir
+sample_input = "mjqjpqmgbljsphdztnvjfqwrcgsmlb"
+
+sample_input
+|> String.split("", trim: true)
+|> Enum.with_index(1)
+|> Enum.chunk_every(4, 1, :discard)
+|> Enum.find(fn [{c1, _}, {c2, _}, {c3, _}, {c4, _}] ->
+  MapSet.new([c1, c2, c3, c4]) |> MapSet.size() == 4
+end)
+|> then(fn marker ->
+  marker |> Enum.at(-1) |> elem(1)
+end)
+|> dbg()
+```
+
+1. Split the string into a list of letters
+2. Add an index to each letter, starting from 1 so our answer is easy
+3. Chunk the list into a sliding window of groups of four
+4. Find the first group where the characters are all different
+5. Get the index for the last character: that's our answer!
+
+```elixir
+defmodule Day6.Part1.A do
+  def marker(input) do
+    input
+    |> String.split("", trim: true)
+    |> Enum.with_index(1)
+    |> Enum.chunk_every(4, 1, :discard)
+    |> Enum.find(fn [{c1, _}, {c2, _}, {c3, _}, {c4, _}] ->
+      MapSet.new([c1, c2, c3, c4]) |> MapSet.size() == 4
+    end)
+    |> then(fn marker ->
+      marker |> Enum.at(-1) |> elem(1)
+    end)
+  end
+end
+```
+
+```elixir
+sample_input
+|> Day6.Part1.A.marker()
+```
+
+```elixir
+"bvwbjplbgvbhsrlpgdmjqwftvncz"
+|> Day6.Part1.A.marker()
+```
+
+```elixir
+"nppdvjthqldpwncqszvftbrmjlhg"
+|> Day6.Part1.A.marker()
+```
+
+```elixir
+"nznrnfrfntjfmvfwmzdfjlvtqnbhcprsg"
+|> Day6.Part1.A.marker()
+```
+
+```elixir
+"zcfzfwzzqfrljwzlrfnpqdbhtmscgvjw"
+|> Day6.Part1.A.marker()
+```
+
+```elixir
+puzzle_input = Kino.Input.textarea("Paste your puzzle input")
+```
+
+```elixir
+puzzle_input
+|> Kino.Input.read()
+|> Day6.Part1.A.marker()
+```
+
+Oof not so efficient. This took **3ms**. The addition of the indexes to make my answer "calculation" easier is probably the fault but oh well.
+
+## Part 2
+
+> Your device's communication system is correctly detecting packets, but still isn't working. It looks like it also needs to look for **messages**.
+
+Let's go!
+
+> A start-of-message marker is just like a start-of-packet marker, except it consists of 14 distinct characters rather than 4.
+
+Ooooh yeah, that's cool.
+
+Samples
+
+> * `mjqjpqmgbljsphdztnvjfqwrcgsmlb`: first marker after character 19
+> * `bvwbjplbgvbhsrlpgdmjqwftvncz`: first marker after character 23
+> * `nppdvjthqldpwncqszvftbrmjlhg`: first marker after character 23
+> * `nznrnfrfntjfmvfwmzdfjlvtqnbhcprsg`: first marker after character 29
+> * `zcfzfwzzqfrljwzlrfnpqdbhtmscgvjw`: first marker after character 26
+
+First off, I don't want to type out `c1` ... `c14` to build the `MapSet` let's get some code in there.
+
+```elixir
+[{"m", 1}, {"j", 2}, {"q", 3}, {"j", 4}]
+|> Enum.map(&elem(&1, 0))
+|> MapSet.new()
+|> MapSet.size()
+|> dbg()
+```
+
+```elixir
+defmodule Day6.Part2.A do
+  def message(input) do
+    input
+    |> String.split("", trim: true)
+    |> Enum.with_index(1)
+    |> Enum.chunk_every(14, 1, :discard)
+    |> Enum.find(fn potential ->
+      unique_count =
+        potential
+        |> Enum.map(&elem(&1, 0))
+        |> MapSet.new()
+        |> MapSet.size()
+
+      unique_count == Enum.count(potential)
+    end)
+    |> then(fn marker ->
+      marker |> Enum.at(-1) |> elem(1)
+    end)
+  end
+end
+```
+
+```elixir
+# first marker after character 19
+"mjqjpqmgbljsphdztnvjfqwrcgsmlb"
+|> Day6.Part2.A.message()
+```
+
+```elixir
+# first marker after character 23
+"bvwbjplbgvbhsrlpgdmjqwftvncz"
+|> Day6.Part2.A.message()
+```
+
+```elixir
+# first marker after character 23
+"nppdvjthqldpwncqszvftbrmjlhg"
+|> Day6.Part2.A.message()
+```
+
+```elixir
+# first marker after character 29
+"nznrnfrfntjfmvfwmzdfjlvtqnbhcprsg"
+|> Day6.Part2.A.message()
+```
+
+```elixir
+# first marker after character 26
+"zcfzfwzzqfrljwzlrfnpqdbhtmscgvjw"
+|> Day6.Part2.A.message()
+```
+
+Looking good! Not much to do here. We only needed to change the window size to 14 and improve the code a bit to more programatically build the MapSet.
+
+```elixir
+puzzle_input
+|> Kino.Input.read()
+|> Day6.Part2.A.message()
+```
+
+Hooray that was fun. In fact let's make a definitive module with the parsing code.
+
+```elixir
+defmodule Day6 do
+  defstruct [:packet, :message]
+
+  def packet(input) do
+    input
+    |> parse(window: 4)
+  end
+
+  def message(input) do
+    input
+    |> parse(window: 14)
+  end
+
+  def parse(input, window: window) do
+    input
+    |> String.split("", trim: true)
+    |> Enum.with_index(1)
+    |> Enum.chunk_every(window, 1, :discard)
+    |> Enum.find(fn potential ->
+      unique_count =
+        potential
+        |> Enum.map(&elem(&1, 0))
+        |> MapSet.new()
+        |> MapSet.size()
+
+      unique_count == Enum.count(potential)
+    end)
+    |> then(fn marker ->
+      marker |> Enum.at(-1) |> elem(1)
+    end)
+  end
+end
+```
+
+```elixir
+puzzle_input
+|> Kino.Input.read()
+|> then(fn input ->
+  %Day6{
+    packet: Day6.packet(input),
+    message: Day6.message(input)
+  }
+end)
+```
+
+How exciting!
