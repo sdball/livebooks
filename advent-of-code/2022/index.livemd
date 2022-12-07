@@ -1,0 +1,11 @@
+<!-- vim: set syntax=markdown: -->
+
+# Advent of Code 2022
+
+## Working solutions
+
+* [Day 1](day1.livemd)
+* [Day 2](day2.livemd)
+* [Day 3](day3.livemd)
+* [Day 4](day4.livemd)
+* [Day 5](day5.livemd)

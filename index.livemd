@@ -21,3 +21,4 @@ Hopefully if you're reading this you clicked the "Run in Livebook" button. That 
 ## Advent of code
 
 * [2021](advent-of-code/2021/index.livemd)
+* [2022](advent-of-code/2022/index.livemd)
