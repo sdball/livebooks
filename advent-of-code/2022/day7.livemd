@@ -1,0 +1,942 @@
+# Advent of Code 2022 - Day 7
+
+```elixir
+Mix.install([
+  {:kino, "~> 0.8.0"}
+])
+```
+
+## Part 1
+
+> The device the Elves gave you has problems with more than just its communication system. You try to run a system update:
+> 
+> ```
+> $ system-update --please --pretty-please-with-sugar-on-top
+> Error: No space left on device
+> Perhaps you can delete some files to make space for the update?
+> ```
+
+Ooh this sounds good.
+
+> You browse around the filesystem to assess the situation and save the resulting terminal output (your puzzle input). For example:
+> 
+> ```
+> $ cd /
+> $ ls
+> dir a
+> 14848514 b.txt
+> 8504156 c.dat
+> dir d
+> $ cd a
+> $ ls
+> dir e
+> 29116 f
+> 2557 g
+> 62596 h.lst
+> $ cd e
+> $ ls
+> 584 i
+> $ cd ..
+> $ cd ..
+> $ cd d
+> $ ls
+> 4060174 j
+> 8033020 d.log
+> 5626152 d.ext
+> 7214296 k
+> ```
+
+Cool, cool.
+
+> The filesystem consists of a tree of files (plain data) and directories (which can contain other directories or files). The outermost directory is called /. You can navigate around the filesystem, moving into or out of directories and listing the contents of the directory you're currently in.
+
+Most excellent. I guess we'll need to parse the input and put together the complete picture of the filesystem.
+
+Maybe a `state` struct to keep track of where we are and a `filesystem` map?
+
+The commands in the input are *nix like.
+
+The output of `ls` is either `NUMBER FILE_NAME` or `dir DIRECTORY_NAME`
+
+e.g. `4060174` j` is a file `j` with a size `4060174`
+
+e.g. `dir e` is a directory e
+
+Directories have no inherent size.
+
+The sample above can be parsed to determine this filesystem
+
+```
+- / (dir)
+  - a (dir)
+    - e (dir)
+      - i (file, size=584)
+    - f (file, size=29116)
+    - g (file, size=2557)
+    - h.lst (file, size=62596)
+  - b.txt (file, size=14848514)
+  - c.dat (file, size=8504156)
+  - d (dir)
+    - j (file, size=4060174)
+    - d.log (file, size=8033020)
+    - d.ext (file, size=5626152)
+    - k (file, size=7214296)
+```
+
+Puzzle
+
+* Determine the total size of each directory (the sum of its files and subdirectory sizes)
+* Find all of the directories with a total size of at most 100000
+* Calculate the sum of their total sizes
+
+(Yes, this process will cause some files to be counted more than once)
+
+In the sample data the result is `95437`
+
+* e is `584`
+* a is `94853`
+* d is `24933642`
+* / is `48381165`
+
+### Representing the filesystem
+
+First let's figure out a good data structure for representing the filesystem.
+
+Then we'll figure out the functions to accomplish the puzzle given a simple hardcoded filesystem.
+
+Then we'll parse the sample input into the filesystem data structure and confirm the results.
+
+And finally we'll parse the puzzle input input and calculate the puzzle answer.
+
+```elixir
+defmodule Filesystem do
+  defmodule File do
+    defstruct [:name, :size]
+
+    def new(keywords) do
+      struct!(File, keywords)
+    end
+  end
+
+  defmodule Directory do
+    defstruct [:name, :parent, children: []]
+
+    def new(keywords) do
+      struct!(Directory, keywords)
+    end
+
+    def add_file(dir, file) do
+      %{dir | children: dir.children ++ [file]}
+    end
+
+    def add_dir(dir, dir) do
+      {:error, :dir_cannot_contain_itself}
+    end
+
+    def add_dir(dir, child_dir) do
+      child_dir = %{child_dir | parent: dir.name}
+      add_file(dir, child_dir)
+    end
+
+    def size(dir) do
+      Enum.reduce(dir.children, 0, fn
+        child, acc when is_struct(child, Filesystem.File) ->
+          acc + child.size
+
+        child, acc when is_struct(child, Filesystem.Directory) ->
+          acc + size(child)
+      end)
+    end
+  end
+end
+```
+
+```elixir
+a = Filesystem.File.new(name: "a", size: 123)
+b = Filesystem.File.new(name: "b", size: 377)
+```
+
+```elixir
+root =
+  Filesystem.Directory.new(name: "/")
+  |> Filesystem.Directory.add_file(a)
+  |> Filesystem.Directory.add_file(b)
+
+sub1 =
+  Filesystem.Directory.new(name: "sub1")
+  |> Filesystem.Directory.add_file(Filesystem.File.new(name: "c", size: 300))
+
+root =
+  root
+  |> Filesystem.Directory.add_dir(sub1)
+```
+
+```elixir
+Filesystem.Directory.size(root)
+```
+
+That works but could get expensive as it laboriously recursively recalculates the size of every directory.
+
+What if we updated the directory size whenever we add a file? Then we could sum those.
+
+```elixir
+defmodule Filesystem2 do
+  defmodule File do
+    defstruct [:name, :size]
+
+    def new(keywords) do
+      struct!(File, keywords)
+    end
+  end
+
+  defmodule Directory do
+    defstruct [:name, :parent, children: [], size: 0]
+
+    def new(keywords) do
+      struct!(Directory, keywords)
+    end
+
+    def add_file(dir, file) do
+      %{dir | children: dir.children ++ [file], size: dir.size + file.size}
+    end
+
+    def add_dir(dir, dir) do
+      {:error, :dir_cannot_contain_itself}
+    end
+
+    def add_dir(dir, child_dir) do
+      child_dir = %{child_dir | parent: dir.name}
+      add_file(dir, child_dir)
+    end
+
+    def size(dir) do
+      Enum.reduce(dir.children, 0, fn
+        child, acc ->
+          acc + child.size
+      end)
+    end
+  end
+end
+```
+
+```elixir
+a = Filesystem2.File.new(name: "a", size: 123)
+b = Filesystem2.File.new(name: "b", size: 377)
+
+root =
+  Filesystem2.Directory.new(name: "/")
+  |> Filesystem2.Directory.add_file(a)
+  |> Filesystem2.Directory.add_file(b)
+
+sub1 =
+  Filesystem2.Directory.new(name: "sub1")
+  |> Filesystem2.Directory.add_file(Filesystem2.File.new(name: "c", size: 300))
+
+root =
+  root
+  |> Filesystem2.Directory.add_dir(sub1)
+```
+
+From the data alone that seems to work great.
+
+```elixir
+Filesystem2.Directory.size(root)
+```
+
+```elixir
+Filesystem2.Directory.size(sub1)
+```
+
+Ok seems doable. Now let's see about parsing the data into the data structure.
+
+In theory it shouldn't be too bad as we aren't creating files during the input, only observing static information about the filesystem.
+
+We may list the same directory more than once though so we should guard against that in fact.
+
+Let's do that guarding real quick.
+
+```elixir
+defmodule Filesystem3 do
+  defmodule File do
+    defstruct [:name, :size]
+
+    def new(keywords) do
+      struct!(File, keywords)
+    end
+  end
+
+  defmodule Directory do
+    defstruct [:name, :parent, children: [], size: 0]
+
+    def new(keywords) do
+      struct!(Directory, keywords)
+    end
+
+    def add_file(dir, file) do
+      dir.children
+      |> Enum.find(nil, fn child ->
+        child.name == file.name
+      end)
+      |> case do
+        nil ->
+          %{dir | children: dir.children ++ [file], size: dir.size + file.size}
+
+        _ ->
+          dir
+      end
+    end
+
+    def add_dir(dir, dir) do
+      {:error, :dir_cannot_contain_itself}
+    end
+
+    def add_dir(dir, child_dir) do
+      child_dir = %{child_dir | parent: dir.name}
+      add_file(dir, child_dir)
+    end
+
+    def size(dir) do
+      Enum.reduce(dir.children, 0, fn
+        child, acc when is_map_key(child, :size) ->
+          acc + child.size
+
+        _child, acc ->
+          acc + 0
+      end)
+    end
+  end
+end
+```
+
+```elixir
+a = Filesystem3.File.new(name: "a", size: 123)
+b = Filesystem3.File.new(name: "b", size: 377)
+
+root =
+  Filesystem3.Directory.new(name: "/")
+  |> Filesystem3.Directory.add_file(a)
+  |> Filesystem3.Directory.add_file(b)
+
+sub1 =
+  Filesystem3.Directory.new(name: "sub1")
+  |> Filesystem3.Directory.add_file(Filesystem3.File.new(name: "c", size: 300))
+
+root =
+  root
+  |> Filesystem3.Directory.add_file(a)
+  |> Filesystem3.Directory.add_file(b)
+  |> Filesystem3.Directory.add_dir(sub1)
+```
+
+There we go. No duplicated files even if we "re-add" them to a directory.
+
+We also need to be able to find directories by path.
+
+### Finding directories by path
+
+That will allow us to have a path in our state and go up a directory by refinding the path from root with the lowest level omitted.
+
+e.g. `path = "/a/b/c"`
+
+To go "up" a directory we change that to `/a/b` and then find that path from root again.
+
+```elixir
+a = Filesystem3.File.new(name: "a", size: 123)
+b = Filesystem3.File.new(name: "b", size: 377)
+
+root =
+  Filesystem3.Directory.new(name: "/")
+  |> Filesystem3.Directory.add_file(a)
+  |> Filesystem3.Directory.add_file(b)
+
+sub2 =
+  Filesystem3.Directory.new(name: "sub2")
+  |> Filesystem3.Directory.add_file(Filesystem3.File.new(name: "d", size: 700))
+
+sub1 =
+  Filesystem3.Directory.new(name: "sub1")
+  |> Filesystem3.Directory.add_file(Filesystem3.File.new(name: "c", size: 300))
+  |> Filesystem3.Directory.add_dir(sub2)
+
+root =
+  root
+  |> Filesystem3.Directory.add_file(a)
+  |> Filesystem3.Directory.add_file(b)
+  |> Filesystem3.Directory.add_dir(sub1)
+```
+
+```elixir
+"/sub1"
+|> String.split("/", trim: true)
+|> Enum.reduce(root, fn dirname, acc ->
+  acc.children
+  |> Enum.filter(&is_struct(&1, Filesystem3.Directory))
+  |> Enum.find(&(&1.name == dirname))
+end)
+```
+
+```elixir
+"/sub1/sub2"
+|> String.split("/", trim: true)
+|> Enum.reduce(root, fn dirname, acc ->
+  acc.children
+  |> Enum.filter(&is_struct(&1, Filesystem3.Directory))
+  |> Enum.find(&(&1.name == dirname))
+end)
+```
+
+It works! We can give a path to this transformation and arrive at the directory specified.
+
+But now, can we easily add files to a subdirectory? Not currently because we need to transform the entire directory structure and currently we can only manipulate a directory.
+
+We need some kind of add full path concept in the present model. To allow us to take the entire root filesystem, add the file to the appropriate directory, and return the new root filesytem.
+
+```elixir
+defmodule Filesystem4 do
+  defmodule File do
+    defstruct [:name, :size]
+
+    def new(keywords) do
+      struct!(File, keywords)
+    end
+  end
+
+  defmodule Directory do
+    defstruct [:name, :parent, children: [], size: 0]
+
+    def new(keywords) do
+      struct!(Directory, keywords)
+    end
+
+    def add_file(root, _path, _child) when not is_nil(root.parent) do
+      {:error, :must_add_path_to_root}
+    end
+
+    def add_file(root, path, child) when is_struct(child, Filesystem4.File) and is_binary(path) do
+      path
+      |> String.split("/", trim: true)
+      |> case do
+        [_filename] ->
+          add_file(root, child)
+
+        paths ->
+          {_filename, dirs} = List.pop_at(paths, -1)
+          updated_children = add_file(root.children, dirs, child)
+          %{root | children: updated_children}
+      end
+    end
+
+    def add_file(children, [subdir | []], child) do
+      index =
+        children
+        |> Enum.find_index(&(&1.name == subdir))
+
+      List.update_at(children, index, fn match ->
+        add_file(match, child)
+      end)
+    end
+
+    # def add_file(children, [subdir | rest], child) do
+    #   # match = children |> find_directory(subdir)
+    # end
+
+    def add_file(dir, file) do
+      dir.children
+      |> Enum.find(nil, fn child ->
+        child.name == file.name
+      end)
+      |> case do
+        nil ->
+          %{dir | children: dir.children ++ [file], size: dir.size + file.size}
+
+        _ ->
+          dir
+      end
+    end
+
+    def add_dir(dir, child_dir) when is_binary(child_dir) do
+      child_dir = new(name: child_dir, parent: dir.name)
+      add_file(dir, child_dir)
+    end
+
+    def size(dir) do
+      Enum.reduce(dir.children, 0, fn
+        child, acc when is_map_key(child, :size) ->
+          acc + child.size
+
+        _child, acc ->
+          acc + 0
+      end)
+    end
+  end
+end
+```
+
+```elixir
+root = Filesystem4.Directory.new(name: "/")
+
+root
+|> Filesystem4.Directory.add_file("/a", Filesystem4.File.new(name: "a", size: 123))
+|> Filesystem4.Directory.add_dir("sub1")
+|> Filesystem4.Directory.add_file("/sub1/b", Filesystem4.File.new(name: "b", size: 123))
+|> Filesystem4.Directory.add_file("/sub1/c", Filesystem4.File.new(name: "c", size: 123))
+```
+
+## Part 1 - Rethinking the entire approach
+
+You know what? This is getting real weird. Let's rethink.
+
+Do we actually **need** to represent the data as a nest of structures? What if we kept a simple map of paths => files?
+
+How would we sum up the files and subdirectories? Find keys that match that pattern and sum those up? Let's see!
+
+```elixir
+fs = %{
+  "/" => [{"a", 123}, {"b", 377}],
+  "/sub1" => [{"c", 500}],
+  "/sub2" => [{"d", 500}],
+  "/sub3/sub4" => [{"e", 700}]
+}
+```
+
+Ok, how big is "/"?
+
+```elixir
+Map.keys(fs)
+|> Enum.filter(&(&1 =~ ~r(^/)))
+|> Enum.map(&Map.get(fs, &1))
+|> Enum.map(fn contents ->
+  Enum.map(contents, &elem(&1, 1))
+  |> Enum.sum()
+end)
+|> Enum.sum()
+```
+
+Ok, how big is "sub2"?
+
+```elixir
+Map.keys(fs)
+|> Enum.filter(&(&1 =~ ~r(^/sub2)))
+|> Enum.map(&Map.get(fs, &1))
+|> Enum.map(fn contents ->
+  Enum.map(contents, &elem(&1, 1))
+  |> Enum.sum()
+end)
+|> Enum.sum()
+```
+
+Ok, how big is "sub3"?
+
+```elixir
+Map.keys(fs)
+|> Enum.filter(&(&1 =~ ~r(^/sub3)))
+|> Enum.map(&Map.get(fs, &1))
+|> Enum.map(fn contents ->
+  Enum.map(contents, &elem(&1, 1))
+  |> Enum.sum()
+end)
+|> Enum.sum()
+```
+
+Hmm! This might just be working. Let's try hardcoding the sample data and checking before we parse into this structure.
+
+```elixir
+hardcoded_sample = %{
+  "/" => [
+    {"b.txt", 14_848_514},
+    {"c.dat", 8_504_156}
+  ],
+  "/a" => [
+    {"f", 29116},
+    {"g", 2557},
+    {"h.lst", 62596}
+  ],
+  "/a/e" => [
+    {"i", 584}
+  ],
+  "/d" => [
+    {"j", 4_060_174},
+    {"d.log", 8_033_020},
+    {"d.ext", 5_626_152},
+    {"k", 7_214_296}
+  ]
+}
+```
+
+To recap
+
+* `/a/e` is `584`
+* `/a` is `94853`
+* `/d` is `24933642`
+* `/` is `48381165`
+
+```elixir
+Map.keys(hardcoded_sample)
+|> Enum.filter(&(&1 =~ ~r(^/a/e)))
+|> Enum.map(&Map.get(hardcoded_sample, &1))
+|> Enum.map(fn contents ->
+  Enum.map(contents, &elem(&1, 1))
+  |> Enum.sum()
+end)
+|> Enum.sum()
+```
+
+```elixir
+Map.keys(hardcoded_sample)
+|> Enum.filter(&(&1 =~ ~r(^/a)))
+|> Enum.map(&Map.get(hardcoded_sample, &1))
+|> Enum.map(fn contents ->
+  Enum.map(contents, &elem(&1, 1))
+  |> Enum.sum()
+end)
+|> Enum.sum()
+```
+
+```elixir
+Map.keys(hardcoded_sample)
+|> Enum.filter(&(&1 =~ ~r(^/d)))
+|> Enum.map(&Map.get(hardcoded_sample, &1))
+|> Enum.map(fn contents ->
+  Enum.map(contents, &elem(&1, 1))
+  |> Enum.sum()
+end)
+|> Enum.sum()
+```
+
+```elixir
+Map.keys(hardcoded_sample)
+|> Enum.filter(&(&1 =~ ~r(^/)))
+|> Enum.map(&Map.get(hardcoded_sample, &1))
+|> Enum.map(fn contents ->
+  Enum.map(contents, &elem(&1, 1))
+  |> Enum.sum()
+end)
+|> Enum.sum()
+```
+
+It works! Way simpler!
+
+### Parsing the input
+
+```elixir
+sample_input = """
+$ cd /
+$ ls
+dir a
+14848514 b.txt
+8504156 c.dat
+dir d
+$ cd a
+$ ls
+dir e
+29116 f
+2557 g
+62596 h.lst
+$ cd e
+$ ls
+584 i
+$ cd ..
+$ cd ..
+$ cd d
+$ ls
+4060174 j
+8033020 d.log
+5626152 d.ext
+7214296 k
+"""
+```
+
+Let's try and split that into chunks of command/output.
+
+The main commands are `cd` and `ls` so if I chunk by `cd` then I should have the cd commands on their own and the `ls` commands next to their output.
+
+Then, as long as I keep a state of my current `path` I can create the files from the `ls` output into the simple map of paths to files.
+
+```elixir
+sample_input
+|> String.split("\n", trim: true)
+|> Enum.chunk_by(&(&1 =~ ~r/^\$ cd/))
+```
+
+```elixir
+defmodule HistoryParser do
+  def parse(history) do
+    start = %{path: "/", filesystem: %{}}
+
+    history
+    |> String.split("\n", trim: true)
+    |> Enum.chunk_by(&(&1 =~ ~r/^\$ cd/))
+    |> Enum.reduce(start, fn chunk, state ->
+      HistoryParser.parse(state, chunk)
+    end)
+  end
+
+  def parse(state, ["$ ls" | output]) do
+    files =
+      output
+      |> Enum.reject(&String.starts_with?(&1, "dir"))
+      |> Enum.map(&String.split/1)
+      |> Enum.map(fn [size, name] ->
+        {name, String.to_integer(size)}
+      end)
+
+    %{state | filesystem: Map.put(state.filesystem, state.path, files)}
+  end
+
+  def parse(state, commands) when is_list(commands) do
+    commands
+    |> Enum.reduce(state, fn command, state ->
+      parse(state, command)
+    end)
+  end
+
+  def parse(state, "$ cd /") do
+    %{state | path: "/"}
+  end
+
+  def parse(state, "$ cd ..") do
+    %{state | path: state.path |> String.replace(~r(/\w+$), "")}
+  end
+
+  def parse(state, command) when is_binary(command) do
+    cond do
+      String.starts_with?(command, "$ cd ") ->
+        subdir = String.replace(command, "$ cd ", "")
+
+        if state.path == "/" do
+          %{state | path: state.path <> subdir}
+        else
+          %{state | path: state.path <> "/" <> subdir}
+        end
+    end
+  end
+end
+```
+
+```elixir
+filesystem =
+  sample_input
+  |> HistoryParser.parse()
+  |> then(fn %{filesystem: filesystem} ->
+    filesystem
+  end)
+```
+
+Hooray what a weird but maybe effective way to model a filesystem!
+
+Now let's calculate sizes for all directories. One of the cool benefits of this model is that there's a built-in list of directories (keys) vs files (values)
+
+```elixir
+defmodule Diskspace do
+  def directory_sizes(filesystem) do
+    Map.keys(filesystem)
+    |> Enum.map(fn dirname ->
+      pattern = ~r/^#{dirname}/
+
+      sum =
+        Map.keys(filesystem)
+        |> Enum.filter(&(&1 =~ pattern))
+        |> Enum.map(&Map.get(filesystem, &1))
+        |> Enum.map(fn contents ->
+          Enum.map(contents, &elem(&1, 1))
+          |> Enum.sum()
+        end)
+        |> Enum.sum()
+
+      {dirname, sum}
+    end)
+  end
+end
+```
+
+```elixir
+Diskspace.directory_sizes(filesystem)
+```
+
+Nice. Now let's solve the sample input puzzle.
+
+## Part 1 - Solving the sample input
+
+```elixir
+defmodule Day7.Part1 do
+  def solve(input) do
+    input
+    |> parse_history()
+    |> get_filesystem()
+    |> calculate_directory_sizes()
+    |> filter_by_size(<=: 100_000)
+    |> sum_sizes()
+  end
+
+  def parse_history(input) do
+    HistoryParser.parse(input)
+  end
+
+  def get_filesystem(%{filesystem: filesystem}) do
+    filesystem
+  end
+
+  def calculate_directory_sizes(filesystem) do
+    Diskspace.directory_sizes(filesystem)
+  end
+
+  def filter_by_size(directory_sizes, <=: max) do
+    directory_sizes
+    |> Enum.filter(fn {_name, size} ->
+      size <= max
+    end)
+  end
+
+  def sum_sizes(directory_sizes) do
+    directory_sizes
+    |> Enum.map(&elem(&1, 1))
+    |> Enum.sum()
+  end
+end
+```
+
+```elixir
+sample_input
+|> Day7.Part1.solve()
+```
+
+That's the right answer for the sample input.
+
+Now the puzzle input!
+
+## Part 1 -Solving the puzzle input
+
+```elixir
+puzzle_input = Kino.Input.textarea("Paste the puzzle input")
+```
+
+```elixir
+puzzle_input
+|> Kino.Input.read()
+|> Day7.Part1.solve()
+```
+
+Solved! On to Part 2
+
+## Part 2
+
+> Now, you're ready to choose a directory to delete.
+
+How exciting.
+
+> The total disk space available to the filesystem is `70_000_000`. To run the update, you need unused space of at least `30_000_000`. You need to find a directory you can delete that will free up enough space to run the update.
+
+> Find the smallest directory that, if deleted, would free up enough space on the filesystem to run the update. What is the total size of that directory?
+
+For the sample data the directories that would work are `/` and `/d` with `/d` being the smaller one.
+
+Ok, we'll start off similarly to Part 1. Construct the filesystem from the input and then calculate directory sizes.
+
+```elixir
+directory_sizes =
+  sample_input
+  |> Day7.Part1.parse_history()
+  |> Day7.Part1.get_filesystem()
+  |> Day7.Part1.calculate_directory_sizes()
+```
+
+Now we need to know some things.
+
+```elixir
+total_disk = 70_000_000
+```
+
+```elixir
+required_space = 30_000_000
+```
+
+```elixir
+available_space = total_disk - (Enum.find(directory_sizes, &(elem(&1, 0) == "/")) |> elem(1))
+```
+
+```elixir
+directory_sizes
+|> Enum.filter(fn {_name, size} ->
+  available_space + size > 30_000_000
+end)
+|> Enum.min_by(fn {_name, size} -> size end)
+```
+
+That seems like the deal. Let's codify it!
+
+```elixir
+defmodule Day7.Part2 do
+  @total_space 70_000_000
+
+  def solve(input, required_space) do
+    directory_sizes =
+      input
+      |> parse_history()
+      |> get_filesystem()
+      |> calculate_directory_sizes()
+
+    used_space = calculate_total_used(directory_sizes)
+
+    minimum_delete_required = required_space - used_space
+
+    directory_sizes
+    |> filter_by_size(>=: minimum_delete_required)
+    |> smallest()
+    |> size_only()
+  end
+
+  def parse_history(input) do
+    HistoryParser.parse(input)
+  end
+
+  def get_filesystem(%{filesystem: filesystem}) do
+    filesystem
+  end
+
+  def calculate_directory_sizes(filesystem) do
+    Diskspace.directory_sizes(filesystem)
+  end
+
+  def filter_by_size(directory_sizes, <=: max) do
+    directory_sizes
+    |> Enum.filter(fn {_name, size} ->
+      size <= max
+    end)
+  end
+
+  def filter_by_size(directory_sizes, >=: min) do
+    directory_sizes
+    |> Enum.filter(fn {_name, size} ->
+      size >= min
+    end)
+  end
+
+  def calculate_total_used(directory_sizes) do
+    @total_space -
+      (Enum.find(directory_sizes, &(elem(&1, 0) == "/"))
+       |> elem(1))
+  end
+
+  def smallest(directory_sizes) do
+    directory_sizes
+    |> Enum.min_by(fn {_name, size} -> size end)
+  end
+
+  def size_only({_name, size}), do: size
+end
+```
+
+```elixir
+sample_input
+|> Day7.Part2.solve(30_000_000)
+```
+
+Looking good!
+
+```elixir
+puzzle_input
+|> Kino.Input.read()
+|> Day7.Part2.solve(30_000_000)
+```
+
+It works!
