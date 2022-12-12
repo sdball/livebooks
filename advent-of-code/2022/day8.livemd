@@ -1,0 +1,614 @@
+# Advent of Code 2022 - Day 8
+
+```elixir
+Mix.install([
+  {:kino, "~> 0.8.0"},
+  {:kino_vega_lite, "~> 0.1.4"}
+])
+```
+
+## Part 1
+
+The task
+
+> you need to **count the number of trees that are visible** from outside the grid when looking directly along a row or column
+
+> The Elves have already launched a quadcopter to generate a map with the height of each tree (your puzzle input). For example:
+> 
+> ```
+> 30373
+> 25512
+> 65332
+> 33549
+> 35390
+> ```
+> 
+> Each tree is represented as a single digit whose value is its height, where 0 is the shortest and 9 is the tallest.
+> 
+> A tree is visible if all of the other trees between it and an edge of the grid are shorter than it. Only consider trees in the same row or column; that is, only look up, down, left, or right from any given tree.
+> 
+> All of the trees around the edge of the grid are visible - since they are already on the edge, there are no trees to block the view.
+
+In the sample arrangement there are `21` trees visible. The `16` trees around the exterior and `5` in the center.
+
+```
+30373
+255 2
+65 32
+3 5 9
+35390
+```
+
+Ok, let's get parsing!
+
+```elixir
+sample_input = """
+30373
+25512
+65332
+33549
+35390
+"""
+```
+
+```elixir
+grid =
+  sample_input
+  |> String.split("\n", trim: true)
+  |> Enum.map(
+    &(String.split(&1, "", trim: true)
+      |> Enum.map(fn tree ->
+        String.to_integer(tree)
+      end))
+  )
+```
+
+Cool, cool. Let's bake in some coordinates.
+
+```elixir
+grid =
+  sample_input
+  |> String.split("\n", trim: true)
+  |> Enum.with_index(fn row, y ->
+    String.split(row, "", trim: true)
+    |> Enum.with_index(fn height, x ->
+      {{x, y}, String.to_integer(height)}
+    end)
+  end)
+```
+
+Cool, cool. Let's get some structured data for this.
+
+```elixir
+defmodule Tree do
+  defstruct [:x, :y, :height, :visible?, :scenic_score]
+
+  def new(coord, height: height) when is_binary(height) do
+    new(coord, height: String.to_integer(height))
+  end
+
+  def new({x, y}, height: height) do
+    %__MODULE__{x: x, y: y, height: height}
+  end
+end
+```
+
+```elixir
+grid =
+  sample_input
+  |> String.split("\n", trim: true)
+  |> Enum.with_index(fn row, y ->
+    String.split(row, "", trim: true)
+    |> Enum.with_index(fn height, x ->
+      Tree.new({x, y}, height: height)
+    end)
+  end)
+```
+
+It's coming together! Let's get the concept of a "TreeMap" some structured data as well. It will hold the grid of trees as well as the maximum in the x and y directions.
+
+```elixir
+defmodule TreeMap do
+  defstruct [:grid, :max_x, :max_y]
+
+  def new(input) do
+    grid =
+      input
+      |> String.split("\n", trim: true)
+      |> Enum.with_index(fn row, y ->
+        String.split(row, "", trim: true)
+        |> Enum.with_index(fn height, x ->
+          Tree.new({x, y}, height: height)
+        end)
+      end)
+
+    %__MODULE__{grid: grid, max_x: max_x(grid), max_y: max_y(grid)}
+  end
+
+  def lookup_tree(treemap, {x, y}) do
+    treemap.grid
+    |> Enum.at(y)
+    |> Enum.at(x)
+  end
+
+  def lines_of_sight(treemap, tree) do
+    {x, y} = {tree.x, tree.y}
+
+    west =
+      for west <- x..0, west != x do
+        TreeMap.lookup_tree(treemap, {west, y})
+      end
+
+    east =
+      for east <- (x + 1)..treemap.max_x, east != x do
+        TreeMap.lookup_tree(treemap, {east, y})
+      end
+
+    north =
+      for north <- y..0, north != y do
+        TreeMap.lookup_tree(treemap, {x, north})
+      end
+
+    south =
+      for south <- (y + 1)..treemap.max_y, south != y and south <= treemap.max_y do
+        TreeMap.lookup_tree(treemap, {x, south})
+      end
+
+    %{west: west, east: east, north: north, south: south}
+  end
+
+  def calculate_tree_visibilities(treemap) do
+    for x <- 0..treemap.max_x,
+        y <- 0..treemap.max_y do
+      lookup_tree(treemap, {x, y})
+    end
+    |> Enum.reduce(treemap, fn tree, acc ->
+      visible = visible?(acc, tree)
+      update_tree(acc, %{tree | visible?: visible})
+    end)
+  end
+
+  def visible?(treemap, tree) do
+    lines_of_sight(treemap, tree)
+    |> Enum.map(fn {_direction, line} ->
+      line
+      |> Enum.reduce_while(%{visible: true}, fn
+        nil, _acc ->
+          {:halt, %{visible: true}}
+
+        other_tree, acc ->
+          if other_tree.height >= tree.height do
+            {:halt, %{visible: false}}
+          else
+            {:cont, acc}
+          end
+      end)
+    end)
+    |> Enum.frequencies()
+    |> case do
+      %{%{visible: false} => 4} ->
+        false
+
+      _ ->
+        true
+    end
+  end
+
+  def count_visible(treemap) do
+    for x <- 0..treemap.max_x, y <- 0..treemap.max_y, reduce: 0 do
+      acc ->
+        tree = lookup_tree(treemap, {x, y})
+
+        if tree.visible? do
+          acc + 1
+        else
+          acc
+        end
+    end
+  end
+
+  def calculate_scenic_scores(treemap) do
+    for x <- 0..treemap.max_x,
+        y <- 0..treemap.max_y do
+      lookup_tree(treemap, {x, y})
+    end
+    |> Enum.reduce(treemap, fn tree, acc ->
+      update_tree(acc, %{tree | scenic_score: scenic_score(treemap, tree)})
+    end)
+  end
+
+  def scenic_score(treemap, tree) do
+    trees_visible(treemap, tree)
+    |> Enum.map(fn %{trees: trees} ->
+      Enum.count(trees)
+    end)
+    |> Enum.product()
+  end
+
+  def trees_visible(treemap, tree) do
+    lines_of_sight(treemap, tree)
+    |> Enum.map(fn {direction, line} ->
+      line
+      |> Enum.reduce_while(%{direction: direction, trees: [], taller_seen: false}, fn
+        nil, acc ->
+          {:halt, acc}
+
+        _other_tree, acc = %{taller_seen: true} ->
+          {:halt, acc}
+
+        other_tree, acc ->
+          if other_tree.height >= tree.height do
+            {:cont, %{acc | taller_seen: true, trees: acc.trees ++ [other_tree]}}
+          else
+            {:cont, %{acc | trees: acc.trees ++ [other_tree]}}
+          end
+      end)
+    end)
+  end
+
+  def most_scenic(treemap) do
+    for x <- 0..treemap.max_x, y <- 0..treemap.max_y, reduce: %{scenic_score: 0} do
+      acc ->
+        tree = lookup_tree(treemap, {x, y})
+
+        if tree.scenic_score > acc.scenic_score do
+          tree
+        else
+          acc
+        end
+    end
+  end
+
+  def update_tree(treemap, new_tree) do
+    updated_grid =
+      treemap.grid
+      |> List.update_at(new_tree.y, fn row ->
+        row
+        |> List.update_at(new_tree.x, fn _tree ->
+          new_tree
+        end)
+      end)
+
+    %{treemap | grid: updated_grid}
+  end
+
+  def update_tree(treemap, position, update) do
+    tree = lookup_tree(treemap, position)
+    new_tree = Map.merge(tree, update)
+    update_tree(treemap, new_tree)
+  end
+
+  defp max_x(grid) do
+    Enum.count(Enum.at(grid, 0)) - 1
+  end
+
+  defp max_y(grid) do
+    Enum.count(grid) - 1
+  end
+end
+```
+
+```elixir
+sample_treemap =
+  sample_input
+  |> TreeMap.new()
+```
+
+```elixir
+TreeMap.calculate_tree_visibilities(sample_treemap)
+|> TreeMap.count_visible()
+```
+
+That's the right answer for the sample data, let's try for a solve!
+
+Yes, we are needlesly iterating through the tree map multiple times. (We could determine visibility and count in one pass.) But I like to see the data transform as an easy way to check the results manually.
+
+```elixir
+defmodule Day8.Part1 do
+  def solve(input) do
+    input
+    |> TreeMap.new()
+    |> TreeMap.calculate_tree_visibilities()
+    |> TreeMap.count_visible()
+  end
+end
+```
+
+```elixir
+sample_input
+|> Day8.Part1.solve()
+```
+
+```elixir
+puzzle_input = Kino.Input.textarea("paste your puzzle input")
+```
+
+```elixir
+puzzle_input
+|> Kino.Input.read()
+|> Day8.Part1.solve()
+```
+
+## Part 2
+
+Now we want to find *any* (visible or hidden) tree with the best **scenic score**
+
+A scenic score is calculated by multiplying the number of trees that are visible from the given tree in each direction. That is, the number of trees in each direction before being blocked by a taller tree. e.g. 1 tree west, 2 trees north, 1 tree east, 3 trees south == `1 * 2 * 1 * 3` == `6`
+
+A sample scenic score. Tree `{2, 1}` (the middle 5 in the second row) is `4`
+
+* North: 1 tree
+* West: 1 tree
+* East: 2 trees
+* South: 2 trees
+
+`1 * 1 * 2 * 2` = `4`
+
+```elixir
+sample_treemap =
+  sample_input
+  |> TreeMap.new()
+```
+
+```elixir
+sample_tree = TreeMap.lookup_tree(sample_treemap, {2, 1})
+```
+
+I added `trees_visible`, `scenic_score`, and other supporting functions to the existing `TreeMap` module in Part 1.
+
+```elixir
+TreeMap.trees_visible(sample_treemap, sample_tree)
+```
+
+```elixir
+TreeMap.scenic_score(sample_treemap, sample_tree)
+```
+
+```elixir
+TreeMap.calculate_scenic_scores(sample_treemap)
+```
+
+```elixir
+TreeMap.calculate_scenic_scores(sample_treemap)
+|> TreeMap.most_scenic()
+```
+
+Ok! Let's code that up.
+
+```elixir
+defmodule Day8.Part2 do
+  def solve(input) do
+    input
+    |> TreeMap.new()
+    |> TreeMap.calculate_scenic_scores()
+    |> TreeMap.most_scenic()
+    |> then(fn tree ->
+      tree.scenic_score
+    end)
+  end
+end
+```
+
+```elixir
+sample_input
+|> Day8.Part2.solve()
+```
+
+```elixir
+puzzle_input
+|> Kino.Input.read()
+|> Day8.Part2.solve()
+```
+
+That's the right answer. But now I'm curious. Is that a scenic tree?
+
+```elixir
+puzzle_input
+|> Kino.Input.read()
+|> TreeMap.new()
+|> TreeMap.calculate_scenic_scores()
+|> TreeMap.calculate_tree_visibilities()
+|> TreeMap.most_scenic()
+```
+
+It is not! Well then what's the most scenic hidden tree?
+
+```elixir
+puzzle_input
+|> Kino.Input.read()
+|> TreeMap.new()
+|> TreeMap.calculate_scenic_scores()
+|> TreeMap.calculate_tree_visibilities()
+|> then(fn treemap ->
+  treemap.grid
+end)
+|> List.flatten()
+|> Enum.reject(& &1.visible?)
+|> Enum.max_by(& &1.scenic_score)
+```
+
+That one.
+
+## Graphing the tree map
+
+```elixir
+puzzle_map =
+  puzzle_input
+  |> Kino.Input.read()
+  |> TreeMap.new()
+  |> TreeMap.calculate_scenic_scores()
+  |> TreeMap.calculate_tree_visibilities()
+  |> then(& &1.grid)
+  |> List.flatten()
+  |> Enum.map(fn tree ->
+    %{
+      "x" => tree.x,
+      "y" => tree.y,
+      "height" => tree.height,
+      "scenic_score" => tree.scenic_score,
+      "visible" => tree.visible?,
+      "hidden" => !tree.visible?
+    }
+  end)
+```
+
+```elixir
+alias VegaLite, as: Vl
+```
+
+```elixir
+Vl.new(width: 700, height: 700, title: "TreeMap by height")
+|> Vl.data_from_values(puzzle_map)
+|> Vl.mark(:rect, tooltip: [content: "data"])
+|> Vl.encode_field(:x, "x", type: :ordinal)
+|> Vl.encode_field(:y, "y", type: :ordinal)
+|> Vl.encode(:color,
+  field: "height",
+  type: :quantitative,
+  legend: true
+)
+```
+
+```elixir
+Vl.new(width: 700, height: 700, title: "TreeMap of visible trees and their height")
+|> Vl.data_from_values(puzzle_map |> Enum.filter(& &1["visible"]))
+|> Vl.mark(:rect, tooltip: [content: "data"])
+|> Vl.encode_field(:x, "x", type: :ordinal)
+|> Vl.encode_field(:y, "y", type: :ordinal)
+|> Vl.encode(:color,
+  field: "height",
+  type: :quantitative,
+  legend: true
+)
+```
+
+```elixir
+Vl.new(width: 700, height: 700, title: "TreeMap of hidden trees and their height")
+|> Vl.data_from_values(puzzle_map |> Enum.filter(& &1["hidden"]))
+|> Vl.mark(:rect, tooltip: [content: "data"])
+|> Vl.encode_field(:x, "x", type: :ordinal)
+|> Vl.encode_field(:y, "y", type: :ordinal)
+|> Vl.encode(:color,
+  field: "height",
+  type: :quantitative,
+  legend: true
+)
+```
+
+```elixir
+Vl.new(width: 600, height: 600, title: "TreeMap by scenic score")
+|> Vl.data_from_values(puzzle_map)
+|> Vl.mark(:rect, tooltip: [content: "data"])
+|> Vl.encode_field(:x, "x", type: :ordinal)
+|> Vl.encode_field(:y, "y", type: :ordinal)
+|> Vl.encode(:color,
+  field: "scenic_score",
+  type: :quantitative,
+  legend: true
+)
+```
+
+## Scratch - lines of sight
+
+Let's determine the lines of sight for a given tree by its coordinates, originating each list at the tree.
+
+```elixir
+max_x = 4
+max_y = 4
+
+#     0 1 2 3 4 = x
+#     ---------
+# 0 | 3 0 3 7 3
+# 1 | 2 5 5 1 2
+# 2 | 6 5 3 3 2
+# 3 | 3 3 5 4 9
+# 4 | 3 5 3 9 0
+# =
+# y
+
+{x, y} = {2, 2}
+
+# finding its column/row neighbors
+
+west =
+  for west <- x..0, west != x do
+    {west, y}
+  end
+
+east =
+  for east <- (x + 1)..max_x, east != x do
+    {east, y}
+  end
+
+north =
+  for north <- y..0, north != y do
+    {x, north}
+  end
+
+south =
+  for south <- (y + 1)..max_y, south != y do
+    {x, south}
+  end
+
+%{west: west, east: east, north: north, south: south}
+```
+
+## Scratch - calculating visibility
+
+```elixir
+sample_treemap =
+  sample_input
+  |> TreeMap.new()
+```
+
+```elixir
+visible_tree = TreeMap.lookup_tree(sample_treemap, {3, 4})
+```
+
+```elixir
+hidden_tree = TreeMap.lookup_tree(sample_treemap, {2, 2})
+```
+
+```elixir
+TreeMap.lines_of_sight(sample_treemap, visible_tree)
+|> Enum.map(fn {_direction, line} ->
+  line
+  |> Enum.reduce_while(%{visible: true}, fn other_tree, acc ->
+    if other_tree.height >= visible_tree.height do
+      {:halt, %{visible: false}}
+    else
+      {:cont, acc}
+    end
+  end)
+end)
+|> Enum.frequencies()
+|> case do
+  %{%{visible: false} => 4} ->
+    false
+
+  _ ->
+    true
+end
+```
+
+```elixir
+TreeMap.lines_of_sight(sample_treemap, hidden_tree)
+|> Enum.map(fn {_direction, line} ->
+  line
+  |> Enum.reduce_while(%{visible: true}, fn other_tree, acc ->
+    if other_tree.height >= hidden_tree.height do
+      {:halt, %{visible: false}}
+    else
+      {:cont, acc}
+    end
+  end)
+end)
+|> Enum.frequencies()
+|> case do
+  %{%{visible: false} => 4} ->
+    false
+
+  _ ->
+    true
+end
+```
