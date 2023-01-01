@@ -1,0 +1,15 @@
+# ExDuck
+
+## Section
+
+```elixir
+Mix.install([{:ex_duck_smart_cell, "~>0.1.4"}])
+```
+
+<!-- livebook:{"attrs":{"answer_variable":"answer","api_result_variable":"api_result","topic":"thyme"},"chunks":null,"kind":"Elixir.ExDuckSmartCell","livebook_object":"smart_cell"} -->
+
+```elixir
+api_result = ExDuck.query!("thyme")
+answer = api_result |> ExDuck.understand()
+answer |> ExDuck.to_markdown() |> Kino.Markdown.new()
+```

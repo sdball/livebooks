@@ -1,0 +1,247 @@
+# Game of Life
+
+```elixir
+Mix.install([
+  {:kino, "~> 0.7.0"}
+])
+```
+
+## Scratch
+
+```
+(0.15 * 66) + (0.35 * 82) + (0.5 * x) = 75
+```
+
+```elixir
+(75 - (0.15 * 66 + 0.35 * 82)) * 2
+```
+
+```elixir
+x = 3
+y = 4
+
+for dx <- -1..1, dy when dx == 0 <- [-1, 1] do
+  {dx + x, dy + y}
+end
+```
+
+```elixir
+x = 3
+y = 4
+
+for dx <- -1..1, dy <- -1..1, {dx, dy} !== {0, 0} do
+  {dx + x, dy + y}
+end
+```
+
+````elixir
+# ```clojure
+# user=> (mapcat reverse [[3 2 1 0] [6 5 4] [9 8 7]])
+# (0 1 2 3 4 5 6 7 8 9)
+# ```
+
+Enum.flat_map([[3, 2, 1, 0], [6, 5, 4], [9, 8, 7]], &Enum.reverse/1)
+````
+
+## Elixir
+
+Conway's Game of Life depends on two functions: `neighbors` and `step`
+
+### `neighbors`
+
+If we consider the cell `{3, 4}` then these are its neighbors.
+
+| c3     | c4     | c5     |
+| ------ | ------ | ------ |
+| {2, 3} | {2, 4} | {2, 5} |
+| {3, 3} | {3, 4} | {3, 5} |
+| {4, 3} | {4, 4} | {4, 5} |
+
+### `step`
+
+The step function takes a list of cells (the board) and returns the next iteration based on the rules of the game of life.
+
+1. Any live cell with two or three live neighbours survives.
+2. Any dead cell with three live neighbours becomes a live cell.
+3. All other live cells die in the next generation. Similarly, all other dead cells stay dead.
+
+```elixir
+defmodule GameOfLife do
+  @moduledoc """
+  Christophe Grand's implementation of Conway's Game of Life
+  (http://clj-me.cgrand.net/2011/08/19/conways-game-of-life)
+
+  Translated from Clojure to Elixir by Stephen Ball.
+  """
+
+  @doc """
+  Returns the coordinates of the neighbors for a given cell: `{x, y}`
+  """
+  def neighbors({x, y}) do
+    for dx <- -1..1, dy <- -1..1, {dx, dy} !== {0, 0} do
+      {dx + x, dy + y}
+    end
+  end
+
+  @doc """
+  Returns the next iteration for the given list of cells.
+
+  iex> GameOfLife.step([{1, 0}, {1, 1}, {1, 2}])
+  [{2, 1}, {1, 1}, {0, 1}]
+  """
+  def step(cells) do
+    # for {cell, n} when n == 3 or (n == 2 and cell in cells) <- Enum.frequencies(Enum.flat_map(cells, &neighbors/1)) do
+    #   cell
+    # end
+
+    cells
+    |> Enum.flat_map(&neighbors/1)
+    |> Enum.frequencies()
+    |> Enum.filter(fn {cell, frequency} ->
+      frequency == 3 or (Enum.member?(cells, cell) && frequency == 2)
+    end)
+    |> Enum.map(fn {cell, _frequency} ->
+      cell
+    end)
+    |> MapSet.new()
+    |> Enum.into([])
+  end
+end
+```
+
+```elixir
+board = [{1, 0}, {1, 1}, {1, 2}]
+
+board
+|> Enum.flat_map(&GameOfLife.neighbors/1)
+|> Enum.frequencies()
+|> Enum.filter(fn {cell, frequency} ->
+  frequency == 3 or (Enum.member?(board, cell) && frequency == 2)
+end)
+|> Enum.map(fn {cell, _frequency} -> cell end)
+|> MapSet.new()
+|> Enum.flat_map(&GameOfLife.neighbors/1)
+|> Enum.frequencies()
+|> Enum.filter(fn {cell, frequency} ->
+  frequency == 3 or (Enum.member?(board, cell) && frequency == 2)
+end)
+|> Enum.map(fn {cell, _frequency} -> cell end)
+|> MapSet.new()
+|> Enum.into([])
+|> dbg()
+```
+
+<!-- livebook:{"branch_parent_index":1} -->
+
+## Elixir Tests
+
+<!-- livebook:{"reevaluate_automatically":true} -->
+
+```elixir
+ExUnit.start(autorun: false)
+
+defmodule GameOfLifeTest do
+  use ExUnit.Case, async: true
+
+  test "neighbors" do
+    cell = {3, 4}
+
+    expected_neighbors = [
+      {2, 3},
+      {2, 4},
+      {2, 5},
+      {3, 3},
+      {3, 5},
+      {4, 3},
+      {4, 4},
+      {4, 5}
+    ]
+
+    assert GameOfLife.neighbors(cell) |> Enum.sort() == expected_neighbors |> Enum.sort()
+  end
+
+  test "step - blinker" do
+    blink_1 = [{1, 0}, {1, 1}, {1, 2}]
+    blink_2 = [{0, 1}, {1, 1}, {2, 1}]
+
+    blink_1
+    |> assert_step(blink_2)
+    |> assert_step(blink_1)
+    |> assert_step(blink_2)
+  end
+
+  defp assert_step(board, expected) do
+    stepped = GameOfLife.step(board)
+    assert stepped == expected
+    stepped
+  end
+end
+
+ExUnit.run()
+```
+
+## Clojure Reference
+
+```clojure
+(ns game-of-life
+  "Conway's Game of Life, based on the work of
+  Christophe Grand (http://clj-me.cgrand.net/2011/08/19/conways-game-of-life)
+  and Laurent Petit (https://gist.github.com/1200343).")
+
+;;; Core game of life's algorithm functions
+
+(defn neighbors
+  "Given a cell's coordinates `[x y]`, returns the coordinates of its
+  neighbors."
+  [[x y]]
+  (for [dx [-1 0 1]
+        dy (if (zero? dx)
+             [-1 1]
+             [-1 0 1])]
+    [(+ dx x) (+ dy y)]))
+
+(defn step
+  "Given a set of living `cells`, computes the new set of living cells."
+  [cells]
+  (set (for [[cell n] (frequencies (mapcat neighbors cells))
+             :when (or (= n 3)
+                       (and (= n 2)
+                            (cells cell)))]
+         cell)))
+
+;;; Utility methods for displaying game on a text terminal
+
+(defn print-grid
+  "Prints a `grid` of `w` columns and `h` rows, on *out*, representing a
+  step in the game."
+  [grid w h]
+  (doseq [x (range (inc w))
+          y (range (inc h))]
+    (when (= y 0) (println))
+    (print (if (grid [x y])
+             "[X]"
+             " . "))))
+
+(defn print-grids
+  "Prints a sequence of `grids` of `w` columns and `h` rows on *out*,
+  representing several steps."
+  [grids w h]
+  (doseq [grid grids]
+    (print-grid grid w h)
+    (println)))
+
+;;; Launches an example grid
+
+(def grid
+  "`grid` represents the initial set of living cells"
+  #{[2 1] [2 2] [2 3]})
+
+(print-grids (take 3 (iterate step grid)) 5 5)
+```
+
+<!-- livebook:{"break_markdown":true} -->
+
+```clojure
+user=> (mapcat reverse [[3 2 1 0] [6 5 4] [9 8 7]])
+(0 1 2 3 4 5 6 7 8 9)
+```

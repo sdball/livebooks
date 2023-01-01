@@ -1,0 +1,83 @@
+# Untitled notebook
+
+```elixir
+Mix.install([
+  {:kino, "~> 0.7.0"},
+  {:jason, "~> 1.4"},
+  {:csv, "~> 3.0"}
+])
+```
+
+## Section
+
+```elixir
+rocket_league_ranks =
+  for rank <- [
+        "Bronze",
+        "Silver",
+        "Gold",
+        "Platinum",
+        "Diamond",
+        "Champion",
+        "Grand Champion",
+        "Supersonic Legend"
+      ],
+      level <- 1..3,
+      division <- 1..4 do
+    {rank, level, "Div", division}
+  end
+```
+
+```elixir
+numeric_ranks =
+  rocket_league_ranks
+  |> Enum.reduce([], fn {rank, _level, "Div", _division}, ranks ->
+    [rank | ranks]
+  end)
+  |> Enum.uniq()
+  |> Enum.reverse()
+  |> Enum.zip(100..800//100)
+  |> Enum.into(%{})
+```
+
+```elixir
+numeric_ranks =
+  rocket_league_ranks
+  |> Enum.map(fn
+    {rank, level = 1, "Div", division} ->
+      ["#{rank} #{level} Div #{division}", numeric_ranks[rank] + (level - 1) + division]
+
+    {rank, level, "Div", division} ->
+      ["#{rank} #{level} Div #{division}", numeric_ranks[rank] + (level - 1) * 10 + division]
+  end)
+```
+
+```elixir
+numeric_ranks
+|> Enum.frequencies_by(fn [_rank, numeric] -> numeric end)
+|> Enum.frequencies_by(fn {_numeric, occurences} -> occurences end)
+```
+
+```elixir
+numeric_ranks
+|> CSV.encode()
+|> Enum.each(&IO.write/1)
+```
+
+```elixir
+indexed_ranks =
+  rocket_league_ranks
+  |> Enum.map(fn {rank, level, "Div", division} ->
+    "#{rank} #{level} Div #{division}"
+  end)
+  |> Enum.zip(1..100)
+```
+
+```elixir
+indexed_ranks
+|> Enum.map(fn {rank, index} ->
+  [rank, index]
+end)
+|> CSV.encode()
+|> Enum.each(&IO.write/1)
+```

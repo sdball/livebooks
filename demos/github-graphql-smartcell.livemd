@@ -1,0 +1,9 @@
+# GitHub GraphQL Smartcell
+
+## Section
+
+```elixir
+Mix.install([
+  {:github_graphql_smartcell, ">= 0.0.0"}
+])
+```
