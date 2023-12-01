@@ -21,11 +21,12 @@ puzzle_input = Kino.Input.read(puzzle_input_kino)
 ## Part 1
 
 ```elixir
-part_1_test_input_kino = Kino.Input.textarea("Please paste the test input for part 1:")
-```
-
-```elixir
-part_1_test_input = Kino.Input.read(part_1_test_input_kino)
+part_1_test_input = """
+1abc2
+pqr3stu8vwx
+a1b2c3d4e5f
+treb7uchet
+"""
 ```
 
 ```elixir
@@ -57,11 +58,15 @@ end)
 ## Part 2
 
 ```elixir
-part_2_test_input_kino = Kino.Input.textarea("Please paste the test input for part 2:")
-```
-
-```elixir
-part_2_test_input = Kino.Input.read(part_2_test_input_kino)
+part_2_test_input = """
+two1nine
+eightwothree
+abcone2threexyz
+xtwone3four
+4nineeightseven2
+zoneight234
+7pqrstsixteen
+"""
 ```
 
 ```elixir
