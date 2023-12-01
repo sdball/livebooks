@@ -1,0 +1,75 @@
+# Asset Price Server - debugging edges
+
+```elixir
+Mix.install([
+  {:kino, "~> 0.8.0"},
+  {:vega_lite, "~> 0.1.6"}
+])
+```
+
+## Analyze log file
+
+```elixir
+log_file = System.get_env("LB_LOG_FILE")
+```
+
+```elixir
+defmodule LogfileHelp do
+  def remove_color_codes(text) do
+    text
+    |> String.replace(~r|\x1b\[[0-9;]*[mG]|, "")
+  end
+
+  def lines(text), do: String.split(text, "\n", trim: true)
+end
+```
+
+```elixir
+defmodule AssetPriceServerLogs do
+  def into_actions(text) do
+    text
+    |> Enum.map(fn line ->
+      line
+      |> String.split("#PID")
+      |> Enum.at(1)
+      |> String.split("] ")
+      |> then(fn [pid, action] ->
+        action |> String.split(" ")
+        {pid, action}
+      end)
+    end)
+  end
+
+  def into_pid_and_context(text) do
+    text
+    |> Enum.map(fn line ->
+      line
+      |> String.split("#PID")
+      |> Enum.at(1)
+    end)
+    |> Enum.reject(&is_nil/1)
+    |> Enum.map(fn line ->
+      line
+      |> String.split("] ")
+      |> then(fn [pid, context] ->
+        {pid, context}
+      end)
+    end)
+  end
+
+  def group_by_pid(actions) do
+    actions
+    |> Enum.group_by(&elem(&1, 0))
+  end
+end
+```
+
+<!-- livebook:{"reevaluate_automatically":true} -->
+
+```elixir
+File.read!(log_file)
+|> LogfileHelp.remove_color_codes()
+|> LogfileHelp.lines()
+|> AssetPriceServerLogs.into_pid_and_context()
+|> AssetPriceServerLogs.group_by_pid()
+```

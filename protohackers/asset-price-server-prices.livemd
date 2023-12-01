@@ -1,0 +1,184 @@
+# Asset Price Server - debugging large prices
+
+```elixir
+Mix.install([
+  {:kino, "~> 0.8.0"},
+  {:vega_lite, "~> 0.1.6"}
+])
+```
+
+## Analyze log file
+
+```elixir
+log_file = System.get_env("LB_LOG_FILE")
+```
+
+```elixir
+defmodule LogfileHelp do
+  def remove_color_codes(text) do
+    text
+    |> String.replace(~r|\x1b\[[0-9;]*[mG]|, "")
+  end
+
+  def lines(text), do: String.split(text, "\n", trim: true)
+end
+```
+
+```elixir
+defmodule AssetPriceServerLogs do
+  def into_actions(text) do
+    text
+    |> Enum.map(fn line ->
+      line
+      |> String.split("#PID")
+      |> Enum.at(1)
+      |> String.split("] ")
+      |> then(fn [pid, action] ->
+        action |> String.split(" ")
+        {pid, action}
+      end)
+    end)
+  end
+
+  def into_pid_and_context(text) do
+    text
+    |> Enum.map(fn line ->
+      line
+      |> String.split("#PID")
+      |> Enum.at(1)
+    end)
+    |> Enum.reject(&is_nil/1)
+    |> Enum.map(fn line ->
+      line
+      |> String.split("] ")
+      |> then(fn [pid, context] ->
+        {pid, context}
+      end)
+    end)
+  end
+
+  def group_by_pid(actions) do
+    actions
+    |> Enum.group_by(&elem(&1, 0))
+  end
+end
+```
+
+<!-- livebook:{"reevaluate_automatically":true} -->
+
+```elixir
+# File.read!(log_file)
+# |> LogfileHelp.remove_color_codes()
+# |> LogfileHelp.lines()
+# |> AssetPriceServerLogs.into_pid_and_context()
+# |> AssetPriceServerLogs.group_by_pid()
+```
+
+These bytes seem to be an issue.
+
+```
+<<73, 9, 92, 8, 251, 255, 255, 254, 202>>
+```
+
+They (currently) parse as
+
+```
+"INSERT 157026555 4294966986"
+```
+
+But based on results from the protohacker check that's calculating a price that's way too high.
+
+The problem spec says each of the two 4 byte parts following the query id are 32 bit integers. Maybe something needs to be specially handled there.
+
+> The next 8 bytes are two signed two's complement 32-bit integers in network byte order (big endian), whose meaning depends on the message type. We'll refer to these numbers as int32, but note this may differ from your system's native int32 type (if any), particularly with regard to byte order. — problem spec from protohackers
+
+Aha Elixir defaults to _unsigned_ integers.
+
+https://hexdocs.pm/elixir/1.12/Kernel.SpecialForms.html#%3C%3C%3E%3E/1-sign
+
+> ### Sign
+> 
+> Integers can be signed or unsigned, defaulting to unsigned.
+> 
+> ```
+> <<int::integer>> = <<-100>>
+> <<156>>
+> int
+> 156
+> <<int::integer-signed>> = <<-100>>
+> <<156>>
+> int
+> -100
+> ```
+> 
+> signed and unsigned are only used for matching binaries (see below) and are only used for integers.
+> 
+> ```
+> <<-100::signed, _rest::binary>> = <<-100, "foo">>
+> <<156, 102, 111, 111>>
+> ```
+> 
+> ### Endianness
+> 
+> Elixir has three options for endianness: big, little, and native. The default is big:
+> 
+> ```
+> <<number::little-integer-size(16)>> = <<0, 1>>
+> <<0, 1>>
+> number
+> 256
+> <<number::big-integer-size(16)>> = <<0, 1>>
+> <<0, 1>>
+> number
+> 1
+> ```
+> 
+> native is determined by the VM at startup and will depend on the host operating system.
+
+```elixir
+bytes = <<73, 9, 92, 8, 251, 255, 255, 254, 202>>
+```
+
+```elixir
+<<"I", timestamp::32, price::32>> = bytes
+dbg(timestamp)
+dbg(price)
+```
+
+```elixir
+<<"I", timestamp::signed-integer-32, price::signed-integer-32>> = bytes
+dbg(timestamp)
+dbg(price)
+```
+
+Yeah that's my problem.
+
+<!-- livebook:{"force_markdown":true} -->
+
+```elixir
+<< "I", timestamp::integer-32, price::integer-32>> = bytes
+```
+
+price: 4294966986
+
+```
+<< "I", timestamp::signed-integer-32, price::signed-integer-32>> = bytes
+```
+
+price: -310
+
+## Signed vs Unsigned
+
+```elixir
+bytes = <<255, 255, 254, 202, 255, 255, 254, 202>>
+```
+
+```elixir
+four_bytes = <<255, 255, 254, 202>>
+
+<<signed::signed-integer-32>> = four_bytes
+<<unsigned::unsigned-integer-32>> = four_bytes
+dbg({signed, unsigned})
+```
+
+Same bytes, different numbers!
