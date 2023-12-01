@@ -1,0 +1,115 @@
+# Advent of Code 2023 - Day 1
+
+```elixir
+Mix.install([
+  {:kino, "~> 0.11.3"},
+  {:kino_vega_lite, "~> 0.1.11"},
+  {:kino_explorer, "~> 0.1.12"}
+])
+```
+
+## Puzzle Input
+
+```elixir
+puzzle_input_kino = Kino.Input.textarea("Please paste the puzzle input:")
+```
+
+```elixir
+puzzle_input = Kino.Input.read(puzzle_input_kino)
+```
+
+## Part 1
+
+```elixir
+part_1_test_input_kino = Kino.Input.textarea("Please paste the test input for part 1:")
+```
+
+```elixir
+part_1_test_input = Kino.Input.read(part_1_test_input_kino)
+```
+
+```elixir
+part_1_test_input
+|> String.split("\n", trim: true)
+|> Enum.map(fn string ->
+  digits = String.replace(string, ~r/\D/, "")
+  first = String.first(digits)
+  last = String.last(digits)
+  "#{first}#{last}"
+end)
+|> Enum.map(&String.to_integer/1)
+|> Enum.sum()
+```
+
+```elixir
+puzzle_input
+|> String.split("\n", trim: true)
+|> Enum.map(fn string ->
+  digits = String.replace(string, ~r/\D/, "")
+  first = String.first(digits)
+  last = String.last(digits)
+  "#{first}#{last}"
+end)
+|> Enum.map(&String.to_integer/1)
+|> Enum.sum()
+```
+
+## Part 2
+
+```elixir
+part_2_test_input_kino = Kino.Input.textarea("Please paste the test input for part 2:")
+```
+
+```elixir
+part_2_test_input = Kino.Input.read(part_2_test_input_kino)
+```
+
+```elixir
+part_2_test_input
+|> String.split("\n", trim: true)
+|> Enum.map(fn string ->
+  string
+  |> String.replace("one", "o1e")
+  |> String.replace("two", "t2")
+  |> String.replace("three", "t3e")
+  |> String.replace("four", "4")
+  |> String.replace("five", "5")
+  |> String.replace("six", "6s")
+  |> String.replace("seven", "7n")
+  |> String.replace("eight", "e8t")
+  |> String.replace("nine", "n9e")
+end)
+|> Enum.map(fn string ->
+  digits = String.replace(string, ~r/\D/, "")
+  first = String.first(digits)
+  last = String.last(digits)
+  "#{first}#{last}"
+end)
+|> Enum.map(&String.to_integer/1)
+|> Enum.sum()
+```
+
+```elixir
+puzzle_input
+|> String.split("\n", trim: true)
+|> Enum.map(fn string ->
+  string
+  |> String.replace("one", "o1e")
+  |> String.replace("two", "t2")
+  |> String.replace("three", "t3e")
+  |> String.replace("four", "4")
+  |> String.replace("five", "5")
+  |> String.replace("six", "6s")
+  |> String.replace("seven", "7n")
+  |> String.replace("eight", "e8t")
+  |> String.replace("nine", "n9e")
+end)
+|> Enum.map(fn string ->
+  digits = String.replace(string, ~r/\D/, "")
+  first = String.first(digits)
+  last = String.last(digits)
+  "#{first}#{last}"
+end)
+|> Enum.map(&String.to_integer/1)
+|> Enum.sum()
+```
