@@ -1,0 +1,109 @@
+# Let's Trie Something
+
+## Trie using maps and atoms
+
+```elixir
+defmodule Trie do
+  def new() do
+    %{}
+  end
+
+  def atomize(word) do
+    word
+    |> String.graphemes()
+    |> Enum.map(&String.to_atom/1)
+  end
+
+  def variants(:e), do: [:e, :"3"]
+  def variants(:o), do: [:o, :"0"]
+  def variants(:l), do: [:l, :"1", :|]
+  def variants(any), do: [any]
+
+  def insert(trie, word) when is_binary(word) do
+    insert(trie, atomize(word))
+  end
+
+  def insert(trie, [next | rest]) do
+    variants(next)
+    |> Enum.reduce(trie, fn letter, acc ->
+      case Map.has_key?(acc, letter) do
+        true -> Map.put(acc, letter, insert(trie[letter], rest))
+        false -> Map.put(acc, letter, insert(Trie.new(), rest))
+      end
+    end)
+  end
+
+  def insert(trie, []) do
+    Map.put(trie, :stop, 1)
+  end
+
+  def contains?(trie, word) when is_binary(word) do
+    contains?(trie, atomize(word))
+  end
+
+  def contains?(trie, [next | rest]) do
+    case Map.has_key?(trie, next) do
+      true -> contains?(trie[next], rest)
+      false -> false
+    end
+  end
+
+  def contains?(%{:stop => _frequency}, []) do
+    true
+  end
+
+  def contains?(_trie, []) do
+    false
+  end
+end
+```
+
+```elixir
+trie = Trie.new()
+```
+
+```elixir
+trie = Trie.insert(trie, "hello")
+trie = Trie.insert(trie, "hi")
+```
+
+```elixir
+{
+  "hello",
+  Trie.contains?(trie, "hello"),
+  "h3llo",
+  Trie.contains?(trie, "h3llo"),
+  "he11o",
+  Trie.contains?(trie, "he11o"),
+  "h3110",
+  Trie.contains?(trie, "h3110")
+}
+```
+
+```elixir
+Trie.contains?(trie, "hell")
+```
+
+```elixir
+Trie.contains?(trie, "hi")
+```
+
+```elixir
+trie = Trie.new()
+
+trie =
+  File.stream!("/usr/share/dict/words")
+  |> Stream.map(&String.trim/1)
+  |> Enum.reduce(trie, fn word, acc ->
+    Trie.insert(acc, word)
+  end)
+```
+
+```elixir
+[
+  Trie.contains?(trie, "loafer"),
+  Trie.contains?(trie, "l0afer"),
+  Trie.contains?(trie, "10afer"),
+  Trie.contains?(trie, "l0af3r")
+]
+```
