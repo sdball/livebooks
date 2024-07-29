@@ -1,0 +1,124 @@
+# Fish Puzzle
+
+```elixir
+Mix.install([
+  {:kino, "~> 0.13.2"}
+])
+```
+
+## Fishy Puzzle
+
+Fish are swimming upstream and downstream. Bigger fish will eat smaller fish. Fish positions in their array are their positions in the river. The values in the fish array are the size of the fish. The fish positions array is paired with an array of directions.
+
+* Upstream (`0`): Fish move to the left (towards the beginning of the array).
+* Downstream (`1`): Fish move to the right (towards the end of the array).
+
+The sizes of the fish are all guaranteed to be unique.
+
+Return the fish that make it upstream and downstream without being eaten.
+
+### Example
+
+* Fish: `[4, 3, 2, 1, 5]`
+* Directions: `[0, 1, 0, 0, 0]`
+
+For ease of reading let's call each fish `A, B, C, D, E`
+
+Fish A (size 4, upstream): No fish to meet yet, so it swims freely to the left.
+
+Fish B (size 3, downstream): No fish to meet yet, so it swims freely to the right.
+
+Fish C (size 2, upstream):
+
+* Meets Fish B (downstream) because Fish C (upstream) moves left and Fish B (downstream) moves right.
+* Fish B (size 3) eats Fish C (size 2).
+* Fish B survives.
+
+Fish D (size 1, upstream):
+
+* Meets Fish B (downstream) because Fish D (upstream) moves left and Fish B (downstream) moves right.
+* Fish B (size 3) eats Fish D (size 1).
+* Fish B survives.
+
+Fish E (size 5, upstream):
+
+* Meets Fish B (downstream) because Fish E (upstream) moves left and Fish B (downstream) moves right.
+* Fish E (size 5) eats Fish B (size 3).
+* Fish E survives.
+
+Therefore, the fish that survive are Fish A and Fish E: which have the values/directions of `[{4, 0}, {5, 0}]`.
+
+### Example 2
+
+* Fish sizes: `[4, 7, 2, 1, 5]`
+* Directions: `[0, 1, 0, 0, 0]`
+
+The surviving fish are `[4, 7]` because fish `4` swims to the left (upstream) unopposed and fish `7` swims to the right (downstream) and eats every other fish.
+
+```elixir
+defmodule Fish do
+  defstruct [:size, :direction]
+
+  def new(size, direction), do: %__MODULE__{size: size, direction: direction}
+
+  def upstream, do: %Fish{direction: 1}
+end
+
+defmodule FishRiver do
+  def solve(fish, directions) do
+    solve(fish, directions, [])
+  end
+
+  # no more fish in the stretch of river, return the survivors
+  defp solve([], _, survivors), do: Enum.reverse(survivors)
+
+  # recur through the fish until all fish have been considered
+  defp solve([size | remaining_fish], [direction | remaining_directions], survivors) do
+    fish = Fish.new(size, direction)
+
+    case fish.direction do
+      1 ->
+        # Fish is swimming downstream, add to stack of survivors (for now)
+        solve(remaining_fish, remaining_directions, [fish | survivors])
+
+      0 ->
+        # Fish is swimming upstream, check for battles with downstream fish
+        battle(fish, remaining_fish, remaining_directions, survivors)
+    end
+  end
+
+  # recur through the downstream fish to battle
+  defp battle(fish = %Fish{}, remaining_fish, directions, [
+         opponent = %Fish{direction: 1} | survivors
+       ])
+       when fish.size > opponent.size do
+    # Upstream fish wins and continues to battle the next downstream fish
+    battle(fish, remaining_fish, directions, survivors)
+  end
+
+  defp battle(fish = %Fish{}, remaining_fish, directions, [
+         opponent = %Fish{direction: 1} | survivors
+       ])
+       when fish.size <= opponent.size do
+    # Downstream fish wins, move on to the next fish in the river
+    solve(remaining_fish, directions, [opponent | survivors])
+  end
+
+  defp battle(fish, remaining_fish, directions, survivors) do
+    # No downstream fish to battle, upstream fish survives
+    solve(remaining_fish, directions, [fish | survivors])
+  end
+end
+```
+
+```elixir
+fish = [4, 17, 18, 1, 9]
+directions = [0, 1, 0, 0, 0]
+FishRiver.solve(fish, directions)
+```
+
+```elixir
+fish = [4, 3, 2, 1, 5]
+directions = [0, 1, 0, 0, 0]
+FishRiver.solve(fish, directions)
+```
