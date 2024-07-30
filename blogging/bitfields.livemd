@@ -1,0 +1,463 @@
+# Bitfields Post
+
+```elixir
+Mix.install([
+  {:jason, "~> 1.4"}
+])
+```
+
+## CandyData
+
+```elixir
+defmodule CandyData do
+  @priority ~w(low medium high urgent)
+  @location 1..100
+  @status ["not empty", "empty"]
+  @candy [
+    "peppermint patties",
+    "m&ms",
+    "reese's pieces",
+    "butterfingers",
+    "cookies"
+  ]
+
+  def serialize(data) do
+    [
+      priority(data),
+      location(data),
+      status(data),
+      candy(data)
+    ]
+  end
+
+  def deserialize([priority, location, status, candy]) do
+    room =
+      if location in @location do
+        "Room #{location}"
+      else
+        nil
+      end
+
+    %{
+      "priority" => Enum.at(@priority, priority),
+      "location" => room,
+      "status" => Enum.at(@status, status),
+      "candy" => Enum.at(@candy, candy)
+    }
+  end
+
+  defp priority(%{"priority" => priority}) do
+    Enum.find_index(@priority, &(&1 == priority))
+  end
+
+  defp location(%{"location" => "Room " <> room}) do
+    room = String.to_integer(room)
+
+    if room in @location do
+      room
+    else
+      :error
+    end
+  end
+
+  defp status(%{"status" => status}) do
+    Enum.find_index(@status, &(&1 == status))
+  end
+
+  defp candy(%{"candy" => candy}) do
+    Enum.find_index(@candy, &(&1 == candy))
+  end
+end
+```
+
+```elixir
+data = %{
+  "candy" => "peppermint patties",
+  "location" => "Room 71",
+  "priority" => "urgent",
+  "status" => "empty"
+}
+```
+
+```elixir
+data
+|> CandyData.serialize()
+|> CandyData.deserialize()
+|> dbg()
+```
+
+```elixir
+other_data = %{
+  "priority" => "low",
+  "location" => "Room 23",
+  "status" => "not empty",
+  "candy" => "m&ms"
+}
+```
+
+```elixir
+other_data
+|> CandyData.serialize()
+|> CandyData.deserialize()
+|> dbg()
+```
+
+```elixir
+data
+|> CandyData.serialize()
+|> Enum.map(&Integer.to_string(&1, 2))
+|> dbg()
+```
+
+```elixir
+json_base10_numbers = [3, 71, 1, 0] |> Jason.encode!()
+json_base2_strings = ["11", "1000111", "1", "0"] |> Jason.encode!()
+```
+
+```elixir
+json_base10_numbers
+|> byte_size()
+|> dbg()
+```
+
+```elixir
+json_base2_strings
+|> byte_size()
+|> dbg()
+```
+
+```elixir
+bitfield = 0b1110001111000
+
+[2, 8, 10, 12, 16]
+|> Enum.each(fn base ->
+  representation = Integer.to_string(bitfield, base)
+
+  case base do
+    digit when digit < 10 ->
+      IO.puts("Base #{base}:  #{representation}")
+
+    _other ->
+      IO.puts("Base #{base}: #{representation}")
+  end
+end)
+```
+
+```elixir
+["11", "1000111", "1", "0"]
+|> Enum.join()
+|> String.to_integer(2)
+|> dbg()
+
+["11", "1000111", "1", "000"]
+|> Enum.join()
+|> String.to_integer(2)
+|> dbg()
+```
+
+```elixir
+Integer.to_string(1822, 2) |> dbg()
+Integer.to_string(7288, 2) |> dbg()
+```
+
+```elixir
+1822
+|> Integer.to_string(2)
+|> String.pad_trailing(13, "0")
+|> String.to_integer(2)
+|> dbg()
+
+7288
+|> Integer.to_string(2)
+|> String.pad_trailing(13, "0")
+|> String.to_integer(2)
+|> dbg()
+```
+
+## BitfieldGenerator
+
+```ruby
+class BitfieldGenerator
+  attr_reader :fields
+
+  def initialize
+    @fields = []
+    @_current_exponent = 0
+  end
+
+  def add_field(name, bits)
+    field_exponent = @_current_exponent
+    @_current_exponent += bits
+    @fields << {
+      name: name,
+      bits: bits,
+      base: 2 ** field_exponent
+    }
+  end
+
+  # operations kept distinct to aide readability
+  def serialize(data_values)
+    calculated = field_values(data_values)
+    # => [0, 8, 1136, 6144]
+
+    calculated.sum
+    # => 7288
+  end
+
+  def field_values(values)
+    values.map.with_index do |value, index|
+      value * @fields[index][:base]
+    end
+  end
+end
+```
+
+And using that code
+
+```ruby
+bf = BitfieldGenerator.new
+bf.add_field('candy', 3)
+bf.add_field('status', 1)
+bf.add_field('location', 7)
+bf.add_field('priority', 2)
+```
+
+Results in
+
+```ruby
+[
+  {
+    :name=>"candy",
+    :bits=>3,
+    :base=>1
+  },
+  {
+    :name=>"status",
+    :bits=>1,
+    :base=>8
+  },
+  {
+    :name=>"location",
+    :bits=>7,
+    :base=>16
+  },
+  {
+    :name=>"priority",
+    :bits=>2,
+    :base=>2048
+  }
+]
+```
+
+```elixir
+defmodule Bitfield do
+  defstruct fields: [], exponent: 0
+
+  defmodule Field do
+    defstruct [:name, :length, :units]
+  end
+
+  def new() do
+    %__MODULE__{}
+  end
+
+  def add_field(%__MODULE__{} = bitfield, name, bits) do
+    bitfield
+    |> update_in(
+      [Access.key!(:fields)],
+      &(&1 ++ [%Field{name: name, length: bits, units: 2 ** bitfield.exponent}])
+    )
+    |> put_in([Access.key!(:exponent)], bitfield.exponent + bits)
+  end
+
+  def to_integer(%__MODULE__{} = bf, values)
+      when is_map(values) and map_size(values) == length(bf.fields) do
+    Enum.reduce(bf.fields, 0, fn field, acc ->
+      acc + field.units * Map.get(values, field.name)
+    end)
+  end
+
+  def to_integer(_bf, _values), do: {:error, :invalid}
+end
+```
+
+```elixir
+bf =
+  Bitfield.new()
+  |> Bitfield.add_field(:candy, 3)
+  |> Bitfield.add_field(:status, 1)
+  |> Bitfield.add_field(:location, 7)
+  |> Bitfield.add_field(:priority, 2)
+```
+
+```elixir
+Bitfield.to_integer(bf, %{candy: 0, status: 1, location: 71, priority: 3})
+```
+
+## Left Shift
+
+```elixir
+import Bitwise
+
+bitfield = 0
+
+candy_value = 0
+candy_bits = 3
+candy_position = 0
+
+bitfield = bitfield + (candy_value <<< candy_position)
+dbg(bitfield |> Integer.to_string(2))
+
+status_value = 1
+status_bits = 1
+status_position = candy_position + candy_bits
+
+bitfield = bitfield + (status_value <<< status_position)
+dbg(bitfield |> Integer.to_string(2))
+
+location_value = 71
+location_bits = 7
+location_position = status_position + status_bits
+
+bitfield = bitfield + (location_value <<< location_position)
+dbg(bitfield |> Integer.to_string(2))
+
+priority_value = 3
+priority_bits = 2
+priority_position = location_position + location_bits
+
+bitfield = bitfield + (priority_value <<< priority_position)
+dbg(bitfield |> Integer.to_string(2))
+```
+
+## Bitwise Right Shift
+
+```elixir
+import Bitwise
+
+for n <- 0..9 do
+  result = 55 >>> n
+  result_string = String.pad_leading("#{result}", 2, " ")
+
+  result
+  |> Integer.to_string(2)
+  |> String.pad_leading(6, " ")
+  |> IO.inspect(label: "55 >>> #{n} = #{result_string}")
+end
+```
+
+## Pattern matching bitfields
+
+```elixir
+<<a::4, b::2, c::2>> = <<0b00011011>>
+dbg(b)
+```
+
+```elixir
+<<a::4, b::2, c::2>> = <<27::8>>
+dbg(b)
+```
+
+```elixir
+<<priority::2, location::7, status::1, candy::3>> = <<7288::13>>
+{priority, location, status, candy} |> dbg()
+```
+
+## Parsing candy status bitfield
+
+```elixir
+bitfield = 0b1110001111000
+
+candy = 0b0000000000111
+candy_shift_right = 0
+
+status = 0b0000000001000
+status_shift_right = 3
+
+location = 0b0011111110000
+location_shift_right = 4
+
+priority = 0b11
+priority_shift_right = 11
+
+bitfield
+|> Bitwise.band(status)
+|> Bitwise.bsr(status_shift_right)
+|> dbg()
+
+bitfield
+|> Bitwise.band(location)
+|> Bitwise.bsr(location_shift_right)
+|> dbg()
+```
+
+## In and Out Again
+
+```elixir
+defmodule Bitfield.V2 do
+  defstruct fields: [], exponent: 0
+
+  defmodule Field do
+    defstruct [:name, :length, :position, :units]
+  end
+
+  def new() do
+    %__MODULE__{}
+  end
+
+  def add_field(%__MODULE__{} = bitfield, name, bits) do
+    bitfield
+    |> update_in(
+      [Access.key!(:fields)],
+      &(&1 ++
+          [
+            %Field{
+              name: name,
+              length: bits,
+              units: 2 ** bitfield.exponent
+            }
+          ])
+    )
+    |> put_in([Access.key!(:exponent)], bitfield.exponent + bits)
+  end
+
+  def to_integer(%__MODULE__{} = bf, values)
+      when is_map(values) and map_size(values) == length(bf.fields) do
+    Enum.reduce(bf.fields, 0, fn field, acc ->
+      acc + field.units * Map.get(values, field.name)
+    end)
+  end
+
+  def to_integer(_bf, _values), do: {:error, :invalid}
+
+  def to_fields(%__MODULE__{} = bf, value) do
+    bf.fields
+    |> Enum.reverse()
+    |> Enum.reduce({[], value, bf.exponent}, fn field, {results, val, length} ->
+      <<result::size(field.length), rest::size(length - field.length)>> = <<val::size(length)>>
+      results = [%{field.name => result} | results]
+      {results, rest, length - field.length}
+    end)
+    |> then(fn {results, _val, _length} ->
+      results
+    end)
+  end
+end
+```
+
+```elixir
+bf =
+  Bitfield.V2.new()
+  |> Bitfield.V2.add_field(:candy, 3)
+  |> Bitfield.V2.add_field(:status, 1)
+  |> Bitfield.V2.add_field(:location, 7)
+  |> Bitfield.V2.add_field(:priority, 2)
+```
+
+```elixir
+value = Bitfield.V2.to_integer(bf, %{candy: 0, status: 1, location: 71, priority: 3})
+```
+
+```elixir
+fields = Bitfield.V2.to_fields(bf, value)
+```
