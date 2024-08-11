@@ -1,0 +1,439 @@
+# Minesweeper
+
+```elixir
+Mix.install([
+  {:kino, "~> 0.13.2"}
+])
+```
+
+## TODO
+
+* [x] Board
+* [x] Square
+* [x] Board.neighbors
+* [x] Board.member?
+* [x] Board.at
+* [x] Board.neighbors returning Squares
+* [x] Board.add_counts
+* [x] Board.reveal({x, y})
+* [x] Board.reveal (automatically reveal all connected)
+* [x] Cleanup reveal flow
+* [x] Interaction with Kino
+* [ ] Flag squares
+* [ ] Recognize defeat
+* [ ] Recognize victory
+
+## Modules
+
+```elixir
+defmodule Square do
+  defstruct [:coordinates, :state, contains: :empty, adjacent_mines: nil]
+
+  def new(x, y) do
+    %__MODULE__{coordinates: {x, y}, state: :hidden}
+  end
+
+  def mine?(%__MODULE__{contains: :mine}), do: true
+  def mine?(%__MODULE__{}), do: false
+
+  def empty?(%__MODULE__{contains: :empty}), do: true
+  def empty?(%__MODULE__{}), do: false
+
+  def unicode(%__MODULE__{state: :hidden}), do: "⬜️"
+  def unicode(%__MODULE__{contains: :empty, adjacent_mines: 0}), do: "🟩"
+
+  def unicode(%__MODULE__{contains: :empty, adjacent_mines: mines}) when mines > 0 do
+    ["#{mines}", "️", "⃣"] |> List.to_string()
+  end
+
+  def unicode(%__MODULE__{contains: :mine}), do: "💣"
+  def unicode(%__MODULE__{contains: :explosion}), do: "💥"
+  def unicode(%__MODULE__{state: :flagged}), do: "🚩"
+
+  def reveal(square = %__MODULE__{state: :hidden, contains: :mine}) do
+    square
+    |> Map.put(:state, :revealed)
+    |> Map.put(:contains, :explosion)
+  end
+
+  def reveal(square = %__MODULE__{state: :hidden}) do
+    Map.put(square, :state, :revealed)
+  end
+
+  def reveal(square = %__MODULE__{}), do: square
+
+  def peek(square = %__MODULE__{state: :hidden}) do
+    Map.put(square, :state, :revealed)
+  end
+
+  def calculate_neighbors({row, col}) do
+    for drow <- -1..1, dcol <- -1..1, {drow, dcol} !== {0, 0} do
+      {drow + row, dcol + col}
+    end
+  end
+
+  def calculate_cardinals(%Square{coordinates: {row, col}}) do
+    for {drow, dcol} <- [{0, -1}, {0, +1}, {-1, 0}, {+1, 0}] do
+      {drow + row, dcol + col}
+    end
+  end
+
+  def calculate_cardinals({row, col}) do
+    for {drow, dcol} <- [{0, -1}, {0, +1}, {-1, 0}, {+1, 0}] do
+      {drow + row, dcol + col}
+    end
+  end
+
+  def mine(square = %__MODULE__{}) do
+    Map.put(square, :contains, :mine)
+  end
+end
+```
+
+```elixir
+defmodule Board do
+  defstruct width: 20, height: 20, mine_count: 5, mines: [], grid: []
+
+  def new(width, height) do
+    default_mine_count = %__MODULE__{}.mine_count
+    new(width, height, default_mine_count)
+  end
+
+  def new(width, height, mine_count) when is_number(mine_count) do
+    %__MODULE__{width: width, height: height, mine_count: mine_count}
+    |> generate_grid()
+    |> add_mines()
+    |> add_counts()
+  end
+
+  def from_pattern(pattern) when is_list(pattern) do
+    height = pattern |> Enum.count()
+    width = pattern |> Enum.at(0) |> Enum.count()
+    board = Board.new(width, height, 0)
+
+    for col <- 0..(width - 1), row <- 0..(height - 1), reduce: board do
+      acc ->
+        token = pattern |> Enum.at(row) |> Enum.at(col)
+
+        case token do
+          "M" ->
+            square = Board.at(acc, {row, col})
+            bomb = Square.mine(square)
+            Board.update(acc, bomb)
+
+          _ ->
+            acc
+        end
+        |> add_counts()
+    end
+  end
+
+  def unicode_lists(board = %__MODULE__{}) do
+    board.grid
+    |> Enum.map(&Square.unicode/1)
+    |> Enum.chunk_every(board.width)
+    |> Enum.map(fn row ->
+      Enum.intersperse(row, " ")
+    end)
+    |> Enum.intersperse("\n")
+  end
+
+  def unicode(board = %__MODULE__{}) do
+    board
+    |> unicode_lists()
+    |> Enum.join()
+  end
+
+  def render(board = %__MODULE__{}) do
+    board
+    |> unicode_lists()
+    |> IO.puts()
+  end
+
+  def render(board = %__MODULE__{}, :counts) do
+    board.grid
+    |> Enum.map(&"|#{&1.adjacent_mines}|")
+    |> Enum.chunk_every(board.width)
+    |> Enum.map(fn row ->
+      Enum.intersperse(row, " ")
+    end)
+    |> Enum.intersperse(?\n)
+    |> IO.puts()
+  end
+
+  def neighbors(board = %__MODULE__{}, coordinates) do
+    Square.calculate_neighbors(coordinates)
+    |> Enum.filter(&Board.member?(board, &1))
+    |> Enum.map(&Board.at(board, &1))
+  end
+
+  def neighboring_mines(board = %__MODULE__{}, coordinates) do
+    neighbors(board, coordinates)
+    |> Enum.filter(&Square.mine?/1)
+  end
+
+  def connected(board = %__MODULE__{}, square = %Square{}) do
+    square
+    |> Square.calculate_cardinals()
+    |> Enum.filter(&Board.member?(board, &1))
+    |> Enum.map(&Board.at(board, &1))
+    |> Enum.filter(fn square ->
+      square.contains == :empty
+    end)
+  end
+
+  def member?(board = %__MODULE__{}, coordinates) do
+    Board.at(board, coordinates)
+    |> case do
+      nil -> false
+      _ -> true
+    end
+  end
+
+  def at(board = %__MODULE__{}, coordinates) do
+    board.grid
+    |> Enum.find(fn s ->
+      s.coordinates == coordinates
+    end)
+  end
+
+  def reveal(board = %__MODULE__{}, {row, col}) do
+    target = Board.at(board, {row, col})
+    reveal(board, target)
+  end
+
+  def reveal(board = %__MODULE__{}, target = %Square{state: :hidden}) do
+    do_reveal(board, target)
+  end
+
+  def reveal(board = %__MODULE__{}, _target), do: board
+
+  def peek(board = %__MODULE__{}, :all) do
+    %{board | grid: board.grid |> Enum.map(&Square.peek/1)}
+  end
+
+  def peek(board = %__MODULE__{}, {row, col}) do
+    target = Board.at(board, {row, col})
+
+    cond do
+      is_nil(target) ->
+        board
+
+      target.state == :hidden ->
+        board |> Board.update(Square.peek(target))
+
+      true ->
+        board
+    end
+  end
+
+  def update(board = %__MODULE__{}, square = %Square{}) do
+    coordinates = square.coordinates
+
+    new_grid =
+      update_in(
+        board.grid,
+        [Access.filter(&match?(%Square{coordinates: ^coordinates}, &1))],
+        fn _old -> square end
+      )
+
+    %{board | grid: new_grid}
+  end
+
+  # -- private --
+
+  defp do_reveal(board = %__MODULE__{}, target = %Square{}) do
+    new_square = Square.reveal(target)
+    coordinates = target.coordinates
+
+    new_grid =
+      update_in(
+        board.grid,
+        [Access.filter(&match?(%Square{coordinates: ^coordinates}, &1))],
+        fn _old -> new_square end
+      )
+
+    new_board = %{board | grid: new_grid}
+
+    cond do
+      new_square.contains == :explosion ->
+        handle_explosion(new_board, new_square)
+
+      new_square.adjacent_mines == 0 ->
+        connected = Board.connected(board, new_square)
+
+        Enum.reduce(connected, new_board, fn square, board ->
+          Board.reveal(board, square)
+        end)
+
+      true ->
+        new_board
+    end
+  end
+
+  # TODO
+  defp handle_explosion(board = %__MODULE__{}, _revealed = %Square{}) do
+    board
+  end
+
+  defp generate_grid(board = %__MODULE__{width: 0}) do
+    %{board | grid: []}
+  end
+
+  defp generate_grid(board = %__MODULE__{height: 0}) do
+    %{board | grid: []}
+  end
+
+  defp generate_grid(board = %__MODULE__{}) do
+    grid =
+      for row <- 0..(board.height - 1), col <- 0..(board.width - 1) do
+        Square.new(row, col)
+      end
+
+    %{board | grid: grid}
+  end
+
+  defp add_mines(board = %__MODULE__{}) do
+    mines =
+      board.grid
+      |> Enum.map(& &1.coordinates)
+      |> Enum.take_random(board.mine_count)
+      |> MapSet.new()
+
+    grid =
+      board.grid
+      |> Enum.map(fn s ->
+        if MapSet.member?(mines, s.coordinates) do
+          %{s | contains: :mine}
+        else
+          s
+        end
+      end)
+
+    %{board | grid: grid}
+  end
+
+  defp add_counts(board = %__MODULE__{}) do
+    grid_with_counts =
+      board.grid
+      |> Enum.map(fn square ->
+        adjacent_mines = Enum.count(Board.neighboring_mines(board, square.coordinates))
+        %{square | adjacent_mines: adjacent_mines}
+      end)
+
+    %{board | grid: grid_with_counts}
+  end
+end
+```
+
+## Usage
+
+```elixir
+board = Board.new(3, 5, 1)
+```
+
+<!-- livebook:{"reevaluate_automatically":true} -->
+
+```elixir
+%{board | grid: board.grid |> Enum.map(&Map.put(&1, :state, :revealed))}
+|> Board.render(:counts)
+```
+
+```elixir
+Board.render(board)
+```
+
+```elixir
+board
+|> Board.peek(:all)
+|> Board.render()
+```
+
+```elixir
+board
+|> Board.reveal({0, 0})
+|> Board.render()
+```
+
+```elixir
+Board.at(board, {0, 1})
+```
+
+```elixir
+Board.neighbors(board, {0, 0})
+```
+
+```elixir
+Board.neighboring_mines(board, {0, 0})
+```
+
+```elixir
+Board.reveal(board, {0, 0})
+```
+
+```elixir
+# {1, 1}
+# want {1, 0}, {1, 2}, {0, 1}, {2, 1}
+# {+0, -1}, {+0, +1}, {-1, +0}, {+1, +0}
+Square.calculate_cardinals({3, 3})
+```
+
+```elixir
+Board.from_pattern([
+  ["E", "E", "E", "E", "E"],
+  ["E", "E", "M", "E", "E"],
+  ["E", "E", "E", "E", "E"],
+  ["E", "E", "E", "E", "E"]
+])
+|> Board.reveal({3, 0})
+|> Board.render()
+```
+
+## Kino
+
+```elixir
+unicode = Board.unicode(board)
+```
+
+```elixir
+kino_board = Kino.Text.new(unicode)
+```
+
+```elixir
+frame = Kino.Frame.new()
+```
+
+```elixir
+Kino.Frame.render(frame, kino_board)
+```
+
+## Interactive
+
+```elixir
+inputs = [
+  row: Kino.Input.text("Row"),
+  column: Kino.Input.text("Column")
+]
+
+form = Kino.Control.form(inputs, submit: "Check", reset_on_submit: [:row, :column])
+```
+
+```elixir
+Kino.animate(form, Board.new(5, 5, 5), fn event, board ->
+  row =
+    case Integer.parse(event[:data][:row]) do
+      {val, _any} -> val
+      :error -> nil
+    end
+
+  col =
+    case Integer.parse(event[:data][:column]) do
+      {val, _any} -> val
+      :error -> nil
+    end
+
+  board = Board.reveal(board, {row, col})
+  rendered = board |> Board.unicode() |> Kino.Text.new()
+  {:cont, rendered, board}
+end)
+```
