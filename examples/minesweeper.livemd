@@ -411,28 +411,26 @@ Kino.Frame.render(frame, kino_board)
 
 ```elixir
 inputs = [
-  row: Kino.Input.text("Row"),
-  column: Kino.Input.text("Column")
+  target: Kino.Input.text("Target e.g. 3,4")
 ]
 
 form = Kino.Control.form(inputs, submit: "Check", reset_on_submit: [:row, :column])
 ```
 
 ```elixir
-Kino.animate(form, Board.new(5, 5, 5), fn event, board ->
-  row =
-    case Integer.parse(event[:data][:row]) do
-      {val, _any} -> val
-      :error -> nil
+Kino.animate(form, Board.new(8, 8, 5), fn event, board ->
+  target =
+    event[:data][:target]
+    |> String.trim()
+    |> String.replace(~r/[^\d,]/, "", global: true)
+    |> String.split(",", trim: true)
+    |> Enum.map(&(Integer.parse(&1) |> elem(0)))
+    |> case do
+      [row, col] -> {row, col}
+      _ -> {-1, -1}
     end
 
-  col =
-    case Integer.parse(event[:data][:column]) do
-      {val, _any} -> val
-      :error -> nil
-    end
-
-  board = Board.reveal(board, {row, col})
+  board = Board.reveal(board, target)
   rendered = board |> Board.unicode() |> Kino.Text.new()
   {:cont, rendered, board}
 end)
