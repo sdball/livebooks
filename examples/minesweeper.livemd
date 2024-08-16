@@ -22,7 +22,9 @@ Mix.install([
 * [x] Flag squares
 * [x] Unflag squares
 * [x] Recognize defeat
-* [ ] Recognize victory
+* [x] Recognize victory (via flags instead of reveals)
+
+Victory via flags instead of reveals is a bit easier, I'll playtest to see how it feels.
 
 **Maybe**
 
@@ -45,6 +47,9 @@ defmodule Square do
 
   def empty?(%__MODULE__{contains: :empty}), do: true
   def empty?(%__MODULE__{}), do: false
+
+  def flag?(%__MODULE__{state: :flagged}), do: true
+  def flag?(%__MODULE__{}), do: false
 
   def unicode(%__MODULE__{state: :flagged}), do: "🚩"
   def unicode(%__MODULE__{state: :hidden}), do: "⬜️"
@@ -71,6 +76,10 @@ defmodule Square do
 
   def peek(square = %__MODULE__{state: :hidden}) do
     Map.put(square, :state, :revealed)
+  end
+
+  def peek(square = %__MODULE__{}) do
+    square
   end
 
   def calculate_neighbors({row, col}) do
@@ -252,7 +261,14 @@ defmodule Board do
 
   def toggle_flag(board = %__MODULE__{}, {row, col}) do
     target = Board.at(board, {row, col})
-    Board.update(board, Square.toggle_flag(target))
+    updated_target = Square.toggle_flag(target)
+    updated_board = Board.update(board, updated_target)
+
+    if Square.flag?(updated_target) do
+      Board.check_for_win(updated_board)
+    else
+      updated_board
+    end
   end
 
   def update(board = %__MODULE__{}, square = %Square{}) do
@@ -266,6 +282,31 @@ defmodule Board do
       )
 
     %{board | grid: new_grid}
+  end
+
+  def flags(board = %__MODULE__{}) do
+    board.grid |> Enum.filter(&Square.flag?/1)
+  end
+
+  def check_for_win(board = %__MODULE__{}) do
+    flags = Board.flags(board)
+    check_for_win(board, board.mines, flags)
+  end
+
+  def check_for_win(board = %__MODULE__{}, mines, flags) when length(mines) != length(flags) do
+    board
+  end
+
+  def check_for_win(board = %__MODULE__{}, mines, flags) do
+    mine_coordinates = mines |> Enum.map(& &1.coordinates) |> Enum.sort()
+    flag_coordinates = flags |> Enum.map(& &1.coordinates) |> Enum.sort()
+
+    if mine_coordinates == flag_coordinates do
+      board = Board.peek(board, :all)
+      %{board | result: :win}
+    else
+      board
+    end
   end
 
   # -- private --
@@ -321,23 +362,25 @@ defmodule Board do
   end
 
   defp add_mines(board = %__MODULE__{}) do
-    mines =
+    mine_coordinates =
       board.grid
       |> Enum.map(& &1.coordinates)
       |> Enum.take_random(board.mine_count)
       |> MapSet.new()
 
-    grid =
+    mined_grid =
       board.grid
       |> Enum.map(fn s ->
-        if MapSet.member?(mines, s.coordinates) do
-          %{s | contains: :mine}
+        if MapSet.member?(mine_coordinates, s.coordinates) do
+          Square.mine(s)
         else
           s
         end
       end)
 
-    %{board | grid: grid}
+    mines = mined_grid |> Enum.filter(&Square.mine?/1)
+
+    %{board | grid: mined_grid, mines: mines}
   end
 
   defp add_counts(board = %__MODULE__{}) do
@@ -446,7 +489,7 @@ form = Kino.Control.form(inputs, submit: "Do The Thing")
 ```
 
 ```elixir
-Kino.animate(form, Board.new(7, 7, 4), fn event, board ->
+Kino.animate(form, Board.new(7, 7, 2), fn event, board ->
   target =
     event[:data][:target]
     |> String.trim()
@@ -467,7 +510,20 @@ Kino.animate(form, Board.new(7, 7, 4), fn event, board ->
         Board.reveal(board, target)
     end
 
-  rendered = board |> Board.unicode() |> Kino.Text.new()
-  {:cont, rendered, board}
+  render =
+    case board.result do
+      :loss ->
+        IO.puts("BOOM")
+        board |> Board.unicode() |> Kino.Text.new()
+
+      :win ->
+        IO.puts("You win!")
+        board |> Board.unicode() |> Kino.Text.new()
+
+      nil ->
+        board |> Board.unicode() |> Kino.Text.new()
+    end
+
+  {:cont, render, board}
 end)
 ```
