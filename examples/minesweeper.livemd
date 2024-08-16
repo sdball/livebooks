@@ -21,8 +21,14 @@ Mix.install([
 * [x] Interaction with Kino
 * [x] Flag squares
 * [x] Unflag squares
-* [ ] Recognize defeat
+* [x] Recognize defeat
 * [ ] Recognize victory
+
+**Maybe**
+
+* [ ] Group board functions into submodules
+  * `Board.Action.reveal`
+  * `Board.Info.unflagged_mines`
 
 ## Modules
 
@@ -105,7 +111,7 @@ end
 
 ```elixir
 defmodule Board do
-  defstruct width: 20, height: 20, mine_count: 5, mines: [], grid: []
+  defstruct width: 20, height: 20, mine_count: 5, mines: [], grid: [], result: nil
 
   def new(width, height) do
     default_mine_count = %__MODULE__{}.mine_count
@@ -210,6 +216,10 @@ defmodule Board do
     end)
   end
 
+  def reveal(board = %__MODULE__{result: :loss}, _target), do: board
+
+  def reveal(board = %__MODULE__{result: :win}, _target), do: board
+
   def reveal(board = %__MODULE__{}, {row, col}) do
     target = Board.at(board, {row, col})
     reveal(board, target)
@@ -289,9 +299,8 @@ defmodule Board do
     end
   end
 
-  # TODO
   defp handle_explosion(board = %__MODULE__{}, _revealed = %Square{}) do
-    board
+    %{board | result: :loss}
   end
 
   defp generate_grid(board = %__MODULE__{width: 0}) do
