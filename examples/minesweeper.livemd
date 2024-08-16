@@ -19,7 +19,8 @@ Mix.install([
 * [x] Board.reveal (automatically reveal all connected)
 * [x] Cleanup reveal flow
 * [x] Interaction with Kino
-* [ ] Flag squares
+* [x] Flag squares
+* [x] Unflag squares
 * [ ] Recognize defeat
 * [ ] Recognize victory
 
@@ -39,6 +40,7 @@ defmodule Square do
   def empty?(%__MODULE__{contains: :empty}), do: true
   def empty?(%__MODULE__{}), do: false
 
+  def unicode(%__MODULE__{state: :flagged}), do: "🚩"
   def unicode(%__MODULE__{state: :hidden}), do: "⬜️"
   def unicode(%__MODULE__{contains: :empty, adjacent_mines: 0}), do: "🟩"
 
@@ -48,7 +50,6 @@ defmodule Square do
 
   def unicode(%__MODULE__{contains: :mine}), do: "💣"
   def unicode(%__MODULE__{contains: :explosion}), do: "💥"
-  def unicode(%__MODULE__{state: :flagged}), do: "🚩"
 
   def reveal(square = %__MODULE__{state: :hidden, contains: :mine}) do
     square
@@ -86,6 +87,18 @@ defmodule Square do
 
   def mine(square = %__MODULE__{}) do
     Map.put(square, :contains, :mine)
+  end
+
+  def toggle_flag(square = %__MODULE__{state: :flagged}) do
+    Map.put(square, :state, :hidden)
+  end
+
+  def toggle_flag(square = %__MODULE__{state: :hidden}) do
+    Map.put(square, :state, :flagged)
+  end
+
+  def toggle_flag(square = %__MODULE__{state: _any}) do
+    square
   end
 end
 ```
@@ -225,6 +238,11 @@ defmodule Board do
       true ->
         board
     end
+  end
+
+  def toggle_flag(board = %__MODULE__{}, {row, col}) do
+    target = Board.at(board, {row, col})
+    Board.update(board, Square.toggle_flag(target))
   end
 
   def update(board = %__MODULE__{}, square = %Square{}) do
@@ -411,14 +429,15 @@ Kino.Frame.render(frame, kino_board)
 
 ```elixir
 inputs = [
-  target: Kino.Input.text("Target e.g. 3,4")
+  target: Kino.Input.text("Target e.g. 3,4"),
+  action: Kino.Input.select("Action", [{:reveal, "Reveal"}, {:flag, "Flag/Unflag"}])
 ]
 
-form = Kino.Control.form(inputs, submit: "Check", reset_on_submit: [:row, :column])
+form = Kino.Control.form(inputs, submit: "Do The Thing")
 ```
 
 ```elixir
-Kino.animate(form, Board.new(8, 8, 5), fn event, board ->
+Kino.animate(form, Board.new(7, 7, 4), fn event, board ->
   target =
     event[:data][:target]
     |> String.trim()
@@ -430,7 +449,15 @@ Kino.animate(form, Board.new(8, 8, 5), fn event, board ->
       _ -> {-1, -1}
     end
 
-  board = Board.reveal(board, target)
+  board =
+    case event[:data][:action] do
+      :flag ->
+        Board.toggle_flag(board, target)
+
+      :reveal ->
+        Board.reveal(board, target)
+    end
+
   rendered = board |> Board.unicode() |> Kino.Text.new()
   {:cont, rendered, board}
 end)
