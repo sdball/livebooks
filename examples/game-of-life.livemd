@@ -2,7 +2,7 @@
 
 ```elixir
 Mix.install([
-  {:kino, "~> 0.7.0"}
+  {:kino, "~> 0.13.2"}
 ])
 ```
 
@@ -66,6 +66,23 @@ The step function takes a list of cells (the board) and returns the next iterati
 3. All other live cells die in the next generation. Similarly, all other dead cells stay dead.
 
 ```elixir
+defmodule Wishes do
+  def step(cells) do
+    for {cell, n} when n == 3 or (n == 2 and cell in [{1, 0}, {1, 1}, {1, 2}]) <-
+          Enum.frequencies(Enum.flat_map(cells, &neighbors/1)) do
+      cell
+    end
+  end
+
+  def neighbors({x, y}) do
+    for dx <- -1..1, dy <- -1..1, {dx, dy} !== {0, 0} do
+      {dx + x, dy + y}
+    end
+  end
+end
+```
+
+```elixir
 defmodule GameOfLife do
   @moduledoc """
   Christophe Grand's implementation of Conway's Game of Life
@@ -84,50 +101,50 @@ defmodule GameOfLife do
   end
 
   @doc """
-  Returns the next iteration for the given list of cells.
+  Returns the next iteration for a given list of cells.
 
-  iex> GameOfLife.step([{1, 0}, {1, 1}, {1, 2}])
-  [{2, 1}, {1, 1}, {0, 1}]
+  iex> GameOfLife.step(MapSet.new([{1, 0}, {1, 1}, {1, 2}]))
+  MapSet.new([{0, 1}, {1, 1}, {2, 1}])
   """
   def step(cells) do
     # for {cell, n} when n == 3 or (n == 2 and cell in cells) <- Enum.frequencies(Enum.flat_map(cells, &neighbors/1)) do
     #   cell
     # end
+    # |> MapSet.new()
 
     cells
     |> Enum.flat_map(&neighbors/1)
     |> Enum.frequencies()
-    |> Enum.filter(fn {cell, frequency} ->
-      frequency == 3 or (Enum.member?(cells, cell) && frequency == 2)
+    |> Enum.reduce(MapSet.new(), fn {cell, neighbors}, acc ->
+      if neighbors == 3 or (neighbors == 2 && MapSet.member?(cells, cell)) do
+        MapSet.put(acc, cell)
+      else
+        acc
+      end
     end)
-    |> Enum.map(fn {cell, _frequency} ->
-      cell
-    end)
-    |> MapSet.new()
-    |> Enum.into([])
   end
 end
 ```
 
 ```elixir
-board = [{1, 0}, {1, 1}, {1, 2}]
+board = MapSet.new([{1, 0}, {1, 1}, {1, 2}])
 
+# two iterations
 board
 |> Enum.flat_map(&GameOfLife.neighbors/1)
 |> Enum.frequencies()
 |> Enum.filter(fn {cell, frequency} ->
-  frequency == 3 or (Enum.member?(board, cell) && frequency == 2)
+  frequency == 3 or (MapSet.member?(board, cell) && frequency == 2)
 end)
 |> Enum.map(fn {cell, _frequency} -> cell end)
 |> MapSet.new()
 |> Enum.flat_map(&GameOfLife.neighbors/1)
 |> Enum.frequencies()
 |> Enum.filter(fn {cell, frequency} ->
-  frequency == 3 or (Enum.member?(board, cell) && frequency == 2)
+  frequency == 3 or (MapSet.member?(board, cell) && frequency == 2)
 end)
 |> Enum.map(fn {cell, _frequency} -> cell end)
 |> MapSet.new()
-|> Enum.into([])
 |> dbg()
 ```
 
