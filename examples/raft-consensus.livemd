@@ -1,0 +1,316 @@
+# RAFT Consensus
+
+## Section
+
+```elixir
+defmodule RaftSystem do
+  def running_servers do
+    Process.list()
+    |> Enum.reduce([], fn pid, acc ->
+      name =
+        case Process.info(pid, :registered_name) do
+          {:registered_name, []} -> nil
+          {:registered_name, name} -> name
+        end
+
+      cond do
+        is_nil(name) ->
+          acc
+
+        name |> to_string() |> String.starts_with?("raft_server") ->
+          [name | acc]
+
+        true ->
+          acc
+      end
+    end)
+  end
+
+  def linked_servers do
+    Process.info(self(), :links)
+    |> case do
+      {:links, pids} ->
+        pids
+        |> Enum.reduce([], fn pid, acc ->
+          name =
+            case Process.info(pid, :registered_name) do
+              {:registered_name, []} -> nil
+              {:registered_name, name} -> name
+            end
+
+          cond do
+            is_nil(name) ->
+              acc
+
+            name |> to_string() |> String.starts_with?("raft_server") ->
+              [name | acc]
+
+            true ->
+              acc
+          end
+        end)
+
+      _else ->
+        []
+    end
+  end
+end
+```
+
+```elixir
+defmodule RaftServer do
+  use GenServer
+
+  # follower, candidate, leader
+  defstruct [
+    :election_timeout,
+    :heartbeat_timeout,
+    :pending_value,
+    :replicated_value,
+    :name,
+    votes: 0,
+    leader: nil,
+    voted: false,
+    leader_state: :follower,
+    term: 0
+  ]
+
+  # -- public api --
+  def put(name, value), do: GenServer.call(name, {:put, value})
+  def value(name), do: GenServer.call(name, :value)
+  def leader_state(name), do: GenServer.call(name, :leader_state)
+
+  # -- RAFT --
+  def peers(name) do
+    RaftSystem.running_servers()
+    |> Enum.reject(&(&1 == name))
+  end
+
+  def reset_election_timeout(timeout) do
+    Process.send_after(self(), :election_timeout, timeout)
+  end
+
+  # -- supervisor api --
+  def start_link(name) do
+    GenServer.start_link(__MODULE__, name, name: name)
+  end
+
+  # -- GenServer --
+  @impl true
+  def init(name) do
+    election_timeout = Enum.random(150..350)
+    reset_election_timeout(election_timeout)
+    {:ok, %__MODULE__{election_timeout: election_timeout, name: name}}
+  end
+
+  @impl true
+  def handle_call(
+        :election_timeout,
+        _from,
+        state = %__MODULE__{election_timeout: election_timeout}
+      ) do
+    {:reply, election_timeout, state}
+  end
+
+  def handle_call(:value, _from, state = %__MODULE__{replicated_value: value}) do
+    {:reply, value, state}
+  end
+
+  def handle_call({:put, value}, _from, state = %__MODULE__{leader_state: :leader}) do
+    peer_servers = peers(state.name)
+    # TODO parallel Task async calls
+    puts =
+      peer_servers
+      |> Enum.map(fn peer ->
+        GenServer.call(peer, {:leader_put, state.name, value})
+      end)
+
+    {:reply, puts, %{state | replicated_value: value}}
+  end
+
+  def handle_call({:put, _value}, _from, state = %__MODULE__{leader: nil}) do
+    {:reply, {:error, :no_leader}, state}
+  end
+
+  def handle_call({:put, _value}, _from, state = %__MODULE__{leader: leader}) do
+    {:reply, {:error, {:leader, leader}}, state}
+  end
+
+  def handle_call({:leader_put, from, value}, _from, state = %__MODULE__{leader: leader})
+      when from == leader do
+    IO.inspect(from)
+    {:reply, :ok, %{state | replicated_value: value}}
+  end
+
+  def handle_call({:leader_put, from, _value}, _from, state = %__MODULE__{}) do
+    {:reply, {:error, [wrong_leader: from, wanted: state.leader]}, state}
+  end
+
+  def handle_call(:leader_state, _from, state = %__MODULE__{leader_state: leader_state}) do
+    {:reply, leader_state, state}
+  end
+
+  @impl true
+  def handle_cast({:request_vote, candidate}, state = %__MODULE__{voted: false}) do
+    IO.puts("#{state.name} voting for #{candidate}")
+    GenServer.cast(candidate, :vote)
+    reset_election_timeout(state.election_timeout)
+    {:noreply, %{state | leader_state: :follower, voted: true}}
+  end
+
+  def handle_cast({:request_vote, _candidate}, state = %__MODULE__{}) do
+    IO.puts("#{state.name} already voted in this election")
+    {:noreply, state}
+  end
+
+  def handle_cast({:election_complete, leader}, state = %__MODULE{}) do
+    IO.puts("#{state.name} recognizes leader #{leader}")
+    {:noreply, %{state | leader: leader}}
+  end
+
+  def handle_cast(:vote, state = %__MODULE__{leader_state: :candidate}) do
+    votes = state.votes + 1
+    IO.puts("#{state.name} got a vote: total votes #{votes}")
+
+    if(votes > Enum.count(peers(state.name)) / 2) do
+      IO.puts("majority reached, notifying peers that #{state.name} is the leader")
+
+      peers(state.name)
+      |> Enum.each(fn peer ->
+        GenServer.cast(peer, {:election_complete, state.name})
+      end)
+
+      {:noreply, %{state | leader_state: :leader, votes: votes}}
+    else
+      IO.puts("no majority yet")
+      {:noreply, %{state | votes: votes}}
+    end
+  end
+
+  def handle_cast(:vote, state = %__MODULE__{}) do
+    {:noreply, state}
+  end
+
+  @impl true
+  def handle_info(:election_timeout, state = %__MODULE__{leader_state: :follower, leader: nil}) do
+    IO.puts("#{state.name} election timeout")
+    peer_servers = peers(state.name)
+    IO.puts("Peers #{inspect(peer_servers)}")
+
+    if Enum.count(peer_servers) == 0 do
+      reset_election_timeout(state.election_timeout)
+      {:noreply, state}
+    else
+      peers(state.name)
+      |> Enum.each(fn peer ->
+        IO.puts("#{state.name} calling #{peer} to request vote")
+        GenServer.cast(peer, {:request_vote, state.name})
+      end)
+
+      {:noreply, %{state | leader_state: :candidate, voted: false, votes: 1}}
+    end
+  end
+
+  def handle_info(:election_timeout, state = %__MODULE__{}) do
+    {:noreply, state}
+  end
+end
+```
+
+## Start servers
+
+```elixir
+[:raft_server1, :raft_server2, :raft_server3]
+|> Enum.map(&RaftServer.start_link/1)
+```
+
+```elixir
+[:raft_server1, :raft_server2, :raft_server3]
+|> Enum.map(&RaftServer.leader_state/1)
+```
+
+```elixir
+[:raft_server1, :raft_server2, :raft_server3]
+|> Enum.map(&GenServer.call(&1, :election_timeout))
+```
+
+## Use Servers
+
+```elixir
+RaftServer.put(:raft_server1, 23)
+```
+
+```elixir
+RaftServer.value(:raft_server3)
+```
+
+## Stop the servers
+
+```elixir
+RaftSystem.running_servers()
+|> Enum.each(&GenServer.stop/1)
+|> dbg()
+```
+
+## Section
+
+```elixir
+GenServer.call(:raft_server1, :election_timeout)
+```
+
+```elixir
+RaftServer.put(:raft_server1, Enum.random(1..100))
+```
+
+```elixir
+RaftServer.value(:raft_server1)
+```
+
+```elixir
+RaftServer.value(:raft_server2)
+```
+
+```elixir
+{
+  Process.whereis(:raft_server1),
+  Process.whereis(:raft_server2),
+  Process.whereis(:raft_server2)
+}
+```
+
+```elixir
+Process.info(self(), :links)
+|> case do
+  {:links, pids} ->
+    pids
+    |> Enum.map(fn pid ->
+      {pid, Process.info(pid, :registered_name)}
+    end)
+
+  error ->
+    error
+end
+```
+
+```elixir
+RaftSystem.running_servers()
+```
+
+```elixir
+RaftSystem.linked_servers()
+```
+
+```elixir
+RaftServer.peers(:raft_server1)
+```
+
+```elixir
+[:raft_server1, :raft_server2, :raft_server3]
+|> Enum.map(&RaftServer.leader_state/1)
+```
+
+```elixir
+RaftSystem.running_servers()
+|> Enum.each(&GenServer.stop/1)
+|> dbg()
+```
