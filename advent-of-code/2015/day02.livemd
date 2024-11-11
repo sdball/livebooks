@@ -1,0 +1,99 @@
+# Advent of Code 2015 - Day 2
+
+```elixir
+Mix.install([
+  {:kino, "~> 0.14.2"},
+  {:kino_vega_lite, "~> 0.1.13"},
+  {:kino_explorer, "~> 0.1.23"}
+])
+```
+
+## Puzzle Input
+
+```elixir
+puzzle_input = Kino.Input.textarea("Please paste the puzzle input:")
+```
+
+## Part 1
+
+```elixir
+part_1_test_input = Kino.Input.textarea("Please paste test input for part 1:")
+```
+
+<!-- livebook:{"reevaluate_automatically":true} -->
+
+```elixir
+part_1_test_input
+|> Kino.Input.read()
+|> String.split("x")
+|> Enum.map(&String.to_integer/1)
+|> then(fn [l, w, h] ->
+  sides = [l * w, w * h, h * l]
+  Enum.sum(sides) * 2 + Enum.min(sides)
+end)
+```
+
+```elixir
+puzzle_input
+|> Kino.Input.read()
+|> String.split("\n")
+|> Enum.map(fn dimensions ->
+  dimensions
+  |> String.split("x")
+  |> Enum.map(&String.to_integer/1)
+  |> then(fn [l, w, h] ->
+    sides = [l * w, w * h, h * l]
+    Enum.sum(sides) * 2 + Enum.min(sides)
+  end)
+end)
+|> Enum.sum()
+```
+
+## Part 2
+
+```elixir
+part_2_test_input = Kino.Input.textarea("Please paste the test input for part 2:")
+```
+
+```elixir
+part_2_test_input
+|> Kino.Input.read()
+|> String.split("x")
+|> Enum.map(&String.to_integer/1)
+|> then(fn dimensions ->
+  wrapping_ribbon =
+    dimensions
+    |> Enum.sort()
+    |> Enum.take(2)
+    |> List.duplicate(2)
+    |> List.flatten()
+    |> Enum.sum()
+
+  bow_ribbon = Enum.product(dimensions)
+  wrapping_ribbon + bow_ribbon
+end)
+```
+
+```elixir
+puzzle_input
+|> Kino.Input.read()
+|> String.split("\n")
+|> Enum.map(fn dimensions ->
+  dimensions =
+    dimensions
+    |> String.split("x")
+    |> Enum.map(&String.to_integer/1)
+
+  wrapping_ribbon =
+    dimensions
+    |> Enum.sort()
+    |> Enum.take(2)
+    |> List.duplicate(2)
+    |> List.flatten()
+    |> Enum.sum()
+
+  bow_ribbon = Enum.product(dimensions)
+  wrapping_ribbon + bow_ribbon
+end)
+|> Enum.sum()
+```
