@@ -1,0 +1,75 @@
+# Advent of Code 2015 - Day 1
+
+```elixir
+Mix.install([
+  {:kino, "~> 0.14.2"},
+  {:kino_vega_lite, "~> 0.1.13"},
+  {:kino_explorer, "~> 0.1.23"}
+])
+```
+
+## Puzzle Input
+
+```elixir
+puzzle_input = Kino.Input.textarea("Please paste the puzzle input:")
+```
+
+## Part 1
+
+```elixir
+part_1_test_input = Kino.Input.textarea("Please paste the test input for part 1:")
+```
+
+<!-- livebook:{"reevaluate_automatically":true} -->
+
+```elixir
+part_1_test_input
+|> Kino.Input.read()
+|> String.to_charlist()
+|> Enum.reduce(0, fn
+  ?(, acc ->
+    acc + 1
+
+  ?), acc ->
+    acc - 1
+end)
+```
+
+```elixir
+puzzle_input
+|> Kino.Input.read()
+|> String.to_charlist()
+|> Enum.reduce_while({_floor = 0, _step = 0}, fn command, {floor, step} ->
+  floor =
+    case command do
+      ?( ->
+        floor + 1
+
+      ?) ->
+        floor - 1
+    end
+
+  step = step + 1
+
+  if floor == -1 do
+    {:halt, step}
+  else
+    {:cont, {floor, step}}
+  end
+end)
+```
+
+## Part 2
+
+```elixir
+part_2_test_input_kino = Kino.Input.textarea("Please paste the test input for part 2:")
+```
+
+```elixir
+part_2_test_input = Kino.Input.read(part_2_test_input_kino)
+```
+
+```elixir
+part_2_test_input
+|> String.split("\n", trim: true)
+```
