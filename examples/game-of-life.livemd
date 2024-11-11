@@ -127,24 +127,31 @@ end
 ```
 
 ```elixir
-board = MapSet.new([{1, 0}, {1, 1}, {1, 2}])
+cells = MapSet.new([{1, 0}, {1, 1}, {1, 2}])
 
 # two iterations
-board
+cells
 |> Enum.flat_map(&GameOfLife.neighbors/1)
 |> Enum.frequencies()
-|> Enum.filter(fn {cell, frequency} ->
-  frequency == 3 or (MapSet.member?(board, cell) && frequency == 2)
+|> Enum.reduce(MapSet.new(), fn {cell, neighbors}, acc ->
+  if neighbors == 3 or (neighbors == 2 && MapSet.member?(cells, cell)) do
+    MapSet.put(acc, cell)
+  else
+    acc
+  end
 end)
-|> Enum.map(fn {cell, _frequency} -> cell end)
-|> MapSet.new()
-|> Enum.flat_map(&GameOfLife.neighbors/1)
-|> Enum.frequencies()
-|> Enum.filter(fn {cell, frequency} ->
-  frequency == 3 or (MapSet.member?(board, cell) && frequency == 2)
-end)
-|> Enum.map(fn {cell, _frequency} -> cell end)
-|> MapSet.new()
+# |> Enum.filter(fn {cell, frequency} ->
+#   frequency == 3 or (MapSet.member?(board, cell) && frequency == 2)
+# end)
+# |> Enum.map(fn {cell, _frequency} -> cell end)
+# |> MapSet.new()
+# |> Enum.flat_map(&GameOfLife.neighbors/1)
+# |> Enum.frequencies()
+# |> Enum.filter(fn {cell, frequency} ->
+#   frequency == 3 or (MapSet.member?(board, cell) && frequency == 2)
+# end)
+# |> Enum.map(fn {cell, _frequency} -> cell end)
+# |> MapSet.new()
 |> dbg()
 ```
 
