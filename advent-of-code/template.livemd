@@ -1,0 +1,44 @@
+# Advent of Code - Template
+
+```elixir
+Mix.install([
+  {:kino, "~> 0.14.2"},
+  {:kino_vega_lite, "~> 0.1.13"},
+  {:kino_explorer, "~> 0.1.23"}
+])
+```
+
+## Puzzle Input
+
+```elixir
+puzzle_input = Kino.Input.textarea("Please paste the puzzle input:")
+```
+
+## Part 1
+
+```elixir
+part_1_test_input = Kino.Input.textarea("Please paste the test input for part 1:")
+```
+
+<!-- livebook:{"reevaluate_automatically":true} -->
+
+```elixir
+part_1_test_input
+|> Kino.Input.read()
+```
+
+```elixir
+puzzle_input
+|> Kino.Input.read()
+```
+
+## Part 2
+
+```elixir
+part_2_test_input = Kino.Input.textarea("Please paste the test input for part 2:")
+```
+
+```elixir
+part_2_test_input
+|> Kino.Input.read()
+```
