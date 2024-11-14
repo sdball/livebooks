@@ -1,0 +1,190 @@
+# Advent of Code 2015 - Day 3
+
+```elixir
+Mix.install([
+  {:kino, "~> 0.14.2"},
+  {:kino_vega_lite, "~> 0.1.13"},
+  {:kino_explorer, "~> 0.1.23"}
+])
+```
+
+## Puzzle Input
+
+```elixir
+puzzle_input = Kino.Input.textarea("Please paste the puzzle input:")
+```
+
+## Part 1
+
+```elixir
+part_1_test_input = Kino.Input.textarea("Please paste the test input for part 1:")
+```
+
+<!-- livebook:{"reevaluate_automatically":true} -->
+
+```elixir
+part_1_test_input
+|> Kino.Input.read()
+|> String.to_charlist()
+|> Enum.map(fn
+  ?^ -> :up
+  ?v -> :down
+  ?< -> :left
+  ?> -> :right
+end)
+|> Enum.reduce({_delivered = [{0, 0}], _position = {0, 0}}, fn direction, {delivered, {x, y}} ->
+  {delta_x, delta_y} =
+    case direction do
+      :up ->
+        {0, 1}
+
+      :down ->
+        {0, -1}
+
+      :left ->
+        {-1, 0}
+
+      :right ->
+        {1, 0}
+    end
+
+  new_house = {x + delta_x, y + delta_y}
+
+  {[new_house | delivered], new_house}
+end)
+|> then(fn {delivered, _last} ->
+  delivered
+end)
+|> Enum.uniq()
+|> Enum.count()
+```
+
+```elixir
+puzzle_input
+|> Kino.Input.read()
+|> String.to_charlist()
+|> Enum.map(fn
+  ?^ -> :up
+  ?v -> :down
+  ?< -> :left
+  ?> -> :right
+end)
+|> Enum.reduce({_delivered = [{0, 0}], _position = {0, 0}}, fn direction, {delivered, {x, y}} ->
+  {delta_x, delta_y} =
+    case direction do
+      :up ->
+        {0, 1}
+
+      :down ->
+        {0, -1}
+
+      :left ->
+        {-1, 0}
+
+      :right ->
+        {1, 0}
+    end
+
+  new_house = {x + delta_x, y + delta_y}
+
+  {[new_house | delivered], new_house}
+end)
+|> then(fn {delivered, _last} ->
+  delivered
+end)
+|> Enum.uniq()
+|> Enum.count()
+```
+
+## Part 2
+
+```elixir
+part_2_test_input = Kino.Input.textarea("Please paste the test input for part 2:")
+```
+
+```elixir
+defmodule Delivery do
+  def parse(instructions) do
+    instructions
+    |> String.to_charlist()
+    |> Enum.map(fn
+      ?^ -> :up
+      ?v -> :down
+      ?< -> :left
+      ?> -> :right
+    end)
+  end
+
+  def deliver(moves) do
+    moves
+    |> Enum.reduce({_delivered = [{0, 0}], _position = {0, 0}}, fn direction,
+                                                                   {delivered, {x, y}} ->
+      {delta_x, delta_y} =
+        case direction do
+          :up ->
+            {0, 1}
+
+          :down ->
+            {0, -1}
+
+          :left ->
+            {-1, 0}
+
+          :right ->
+            {1, 0}
+        end
+
+      new_house = {x + delta_x, y + delta_y}
+
+      {[new_house | delivered], new_house}
+    end)
+    |> then(fn {delivered, _last} ->
+      delivered
+    end)
+  end
+end
+```
+
+```elixir
+part_2_test_input
+|> Kino.Input.read()
+|> Delivery.parse()
+|> Enum.with_index()
+|> Enum.group_by(fn {_dir, index} ->
+  Integer.mod(index, 2) == 0
+end)
+|> Enum.map(fn
+  {true, moves} ->
+    moves = Enum.map(moves, fn {direction, _index} -> direction end)
+    Delivery.deliver(moves)
+
+  {false, moves} ->
+    moves = Enum.map(moves, fn {direction, _index} -> direction end)
+    Delivery.deliver(moves)
+end)
+|> List.flatten()
+|> Enum.uniq()
+|> Enum.count()
+```
+
+```elixir
+puzzle_input
+|> Kino.Input.read()
+|> Delivery.parse()
+|> Enum.with_index()
+|> Enum.group_by(fn {_dir, index} ->
+  Integer.mod(index, 2) == 0
+end)
+|> Enum.map(fn
+  {true, moves} ->
+    moves = Enum.map(moves, fn {direction, _index} -> direction end)
+    Delivery.deliver(moves)
+
+  {false, moves} ->
+    moves = Enum.map(moves, fn {direction, _index} -> direction end)
+    Delivery.deliver(moves)
+end)
+|> List.flatten()
+|> Enum.uniq()
+|> Enum.count()
+```
