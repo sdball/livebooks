@@ -1,0 +1,143 @@
+# Advent of Code - 2024 - Day 1
+
+```elixir
+Mix.install([
+  {:kino, "~> 0.14.2"},
+  {:kino_vega_lite, "~> 0.1.13"},
+  {:kino_explorer, "~> 0.1.23"}
+])
+```
+
+## Puzzle Input
+
+```elixir
+puzzle_input = Kino.Input.textarea("Please paste the puzzle input:")
+```
+
+## Part 1
+
+```elixir
+part_1_test_input = Kino.Input.textarea("Please paste the test input for part 1:")
+```
+
+<!-- livebook:{"reevaluate_automatically":true} -->
+
+```elixir
+part_1_test_input
+|> Kino.Input.read()
+|> String.split("\n")
+|> Enum.reduce({_list1 = [], _list2 = []}, fn pair, {list1, list2} ->
+  [a, b] =
+    pair
+    |> String.split()
+
+  {a, b} = {String.to_integer(a), String.to_integer(b)}
+  list1 = [a | list1]
+  list2 = [b | list2]
+  {list1, list2}
+end)
+|> then(fn {list1, list2} ->
+  list1 = Enum.sort(list1)
+  list2 = Enum.sort(list2)
+
+  Enum.zip(list1, list2)
+  |> Enum.map(fn {left, right} ->
+    abs(left - right)
+  end)
+  |> Enum.sum()
+end)
+```
+
+```elixir
+puzzle_input
+|> Kino.Input.read()
+|> String.split("\n")
+|> Enum.reduce({_list1 = [], _list2 = []}, fn pair, {list1, list2} ->
+  [a, b] =
+    pair
+    |> String.split()
+
+  {a, b} = {String.to_integer(a), String.to_integer(b)}
+  list1 = [a | list1]
+  list2 = [b | list2]
+  {list1, list2}
+end)
+|> then(fn {list1, list2} ->
+  list1 = Enum.sort(list1)
+  list2 = Enum.sort(list2)
+
+  Enum.zip(list1, list2)
+  |> Enum.map(fn {left, right} ->
+    abs(left - right)
+  end)
+  |> Enum.sum()
+end)
+```
+
+## Part 2
+
+```elixir
+part_2_test_input = Kino.Input.textarea("Please paste the test input for part 2:")
+```
+
+```elixir
+part_2_test_input
+|> Kino.Input.read()
+|> String.split("\n")
+|> Enum.reduce({_list1 = [], _list2 = []}, fn pair, {list1, list2} ->
+  [a, b] =
+    pair
+    |> String.split()
+
+  {a, b} = {String.to_integer(a), String.to_integer(b)}
+  list1 = [a | list1]
+  list2 = [b | list2]
+  {list1, list2}
+end)
+|> then(fn {list1, list2} ->
+  {
+    Enum.reverse(list1),
+    Enum.reverse(list2)
+  }
+end)
+|> then(fn {list1, list2} ->
+  list2_counts = Enum.frequencies(list2)
+
+  list1
+  |> Enum.map(fn left ->
+    left * Map.get(list2_counts, left, 0)
+  end)
+  |> Enum.sum()
+end)
+```
+
+```elixir
+puzzle_input
+|> Kino.Input.read()
+|> String.split("\n")
+|> Enum.reduce({_list1 = [], _list2 = []}, fn pair, {list1, list2} ->
+  [a, b] =
+    pair
+    |> String.split()
+
+  {a, b} = {String.to_integer(a), String.to_integer(b)}
+  list1 = [a | list1]
+  list2 = [b | list2]
+  {list1, list2}
+end)
+|> then(fn {list1, list2} ->
+  {
+    Enum.reverse(list1),
+    Enum.reverse(list2)
+  }
+end)
+|> then(fn {list1, list2} ->
+  list2_counts = Enum.frequencies(list2)
+
+  list1
+  |> Enum.map(fn left ->
+    left * Map.get(list2_counts, left, 0)
+  end)
+  |> Enum.sum()
+end)
+```
