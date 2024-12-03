@@ -42,3 +42,8 @@ part_2_test_input = Kino.Input.textarea("Please paste the test input for part 2:
 part_2_test_input
 |> Kino.Input.read()
 ```
+
+```elixir
+puzzle_input
+|> Kino.Input.read()
+```
