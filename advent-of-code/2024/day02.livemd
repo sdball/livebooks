@@ -1,0 +1,191 @@
+# Advent of Code - 2024 - Day 2
+
+```elixir
+Mix.install([
+  {:kino, "~> 0.14.2"},
+  {:kino_vega_lite, "~> 0.1.13"},
+  {:kino_explorer, "~> 0.1.23"}
+])
+```
+
+## Puzzle Input
+
+```elixir
+puzzle_input = Kino.Input.textarea("Please paste the puzzle input:")
+```
+
+```elixir
+for {x, i} <- Enum.with_index([9, 10, 11, 12, 13]) do
+  {x, i}
+end
+```
+
+```elixir
+list = [11, 12, 13, 14, 15]
+
+for i <- 0..Enum.count(list) - 1 do
+  List.delete_at(list, i)
+end
+```
+
+## Part 1
+
+```elixir
+part_1_test_input = Kino.Input.textarea("Please paste the test input for part 1:")
+```
+
+```elixir
+defmodule NuclearReport do
+  defstruct [:data, :categorization]
+
+  def new(data) do
+    %__MODULE__{data: data}
+  end
+
+  def categorize(report = %__MODULE__{data: data}) do
+    %{report | categorization: categorize(data)}
+  end
+
+  def categorize(data) do
+    data
+    |> Enum.chunk_every(2, 1, :discard)
+    |> Enum.reduce_while(:unknown, fn [left, right], direction ->
+      change = left - right
+
+      if abs(change) <= 0 or abs(change) > 3 do
+        {:halt, :unsafe}
+      else
+        case direction do
+          :unknown ->
+            direction =
+              if change > 0 do
+                :positive
+              else
+                :negative
+              end
+
+            {:cont, direction}
+
+          :positive ->
+            if change < 0 do
+              {:halt, :unsafe}
+            else
+              {:cont, direction}
+            end
+
+          :negative ->
+            if change > 0 do
+              {:halt, :unsafe}
+            else
+              {:cont, direction}
+            end
+        end
+      end
+    end)
+    |> then(fn
+      :negative -> :safe
+      :positive -> :safe
+      result -> result
+    end)
+  end
+
+  def apply_problem_damper(report = %__MODULE{data: data}) do
+    possibilities =
+      for i <- 0..(Enum.count(data) - 1) do
+        List.delete_at(data, i)
+      end
+
+    damper_result =
+      possibilities
+      |> Enum.reduce_while(:unsafe, fn possible_data, result ->
+        if result == :safe do
+          {:halt, result}
+        else
+          {:cont, categorize(possible_data)}
+        end
+      end)
+
+    %{report | categorization: damper_result}
+  end
+end
+```
+
+```elixir
+defmodule NuclearReports do
+  def parse(input) do
+    input
+    |> String.split("\n")
+    |> Enum.map(fn line ->
+      String.split(line)
+      |> Enum.map(&String.to_integer/1)
+    end)
+    |> Enum.map(&NuclearReport.new/1)
+  end
+
+  def categorize(reports) do
+    reports
+    |> Enum.map(&NuclearReport.categorize/1)
+  end
+
+  def apply_problem_damper(reports) do
+    grouped = NuclearReports.group_by_categorization(reports)
+
+    updated =
+      grouped[:unsafe]
+      |> Enum.map(&NuclearReport.apply_problem_damper/1)
+      |> NuclearReports.group_by_categorization()
+
+    grouped
+    |> Map.put(:unsafe, updated[:unsafe])
+    |> Map.put(:safe, grouped[:safe] ++ updated[:safe])
+    |> Map.values()
+    |> List.flatten()
+  end
+
+  def group_by_categorization(reports) do
+    Enum.group_by(reports, & &1.categorization)
+  end
+end
+```
+
+<!-- livebook:{"reevaluate_automatically":true} -->
+
+```elixir
+part_1_test_input
+|> Kino.Input.read()
+|> NuclearReports.parse()
+|> NuclearReports.categorize()
+|> Enum.count(fn report -> report.categorization == :safe end)
+```
+
+```elixir
+puzzle_input
+|> Kino.Input.read()
+|> NuclearReports.parse()
+|> NuclearReports.categorize()
+|> Enum.count(fn report -> report.categorization == :safe end)
+```
+
+## Part 2
+
+```elixir
+part_2_test_input = Kino.Input.textarea("Please paste the test input for part 2:")
+```
+
+```elixir
+part_2_test_input
+|> Kino.Input.read()
+|> NuclearReports.parse()
+|> NuclearReports.categorize()
+|> NuclearReports.apply_problem_damper()
+|> Enum.count(fn report -> report.categorization == :safe end)
+```
+
+```elixir
+puzzle_input
+|> Kino.Input.read()
+|> NuclearReports.parse()
+|> NuclearReports.categorize()
+|> NuclearReports.apply_problem_damper()
+|> Enum.count(fn report -> report.categorization == :safe end)
+```
