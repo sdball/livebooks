@@ -71,7 +71,7 @@ puzzle_input
 
 ```elixir
 defmodule ConditionalInstructions do
-  @conditional_mul ~r/don't|do|mul\(\d+,\d+\)/
+  @conditional_mul ~r/don't\(\)|do\(\)|mul\(\d+,\d+\)/
 
   def extract_valid_multiplication(instructions) do
     Regex.scan(@conditional_mul, instructions)
@@ -79,10 +79,10 @@ defmodule ConditionalInstructions do
     |> Enum.reduce({:enabled, []}, fn
       statement, {state, valid} ->
         case statement do
-          "don't" ->
+          "don't()" ->
             {:disabled, valid}
 
-          "do" ->
+          "do()" ->
             {:enabled, valid}
 
           multiplication ->
