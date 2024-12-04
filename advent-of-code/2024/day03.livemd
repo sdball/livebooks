@@ -77,7 +77,7 @@ defmodule ConditionalInstructions do
     Regex.scan(@conditional_mul, instructions)
     |> List.flatten()
     |> Enum.reduce({:enabled, []}, fn
-      statement, {accept, valid} ->
+      statement, {state, valid} ->
         case statement do
           "don't" ->
             {:disabled, valid}
@@ -86,10 +86,10 @@ defmodule ConditionalInstructions do
             {:enabled, valid}
 
           multiplication ->
-            if accept == :enabled do
-              {accept, [multiplication | valid]}
+            if state == :enabled do
+              {state, [multiplication | valid]}
             else
-              {accept, valid}
+              {state, valid}
             end
         end
     end)
