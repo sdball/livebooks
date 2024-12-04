@@ -1,0 +1,124 @@
+# Advent of Code - 2024 - Day 3
+
+```elixir
+Mix.install([
+  {:kino, "~> 0.14.2"},
+  {:kino_vega_lite, "~> 0.1.13"},
+  {:kino_explorer, "~> 0.1.23"}
+])
+```
+
+## Puzzle Input
+
+```elixir
+puzzle_input = Kino.Input.textarea("Please paste the puzzle input:")
+```
+
+```elixir
+defmodule Instructions do
+  @mul_pattern ~r/mul\(\d+,\d+\)/
+
+  def extract_valid_multiplication(instructions) do
+    Regex.scan(@mul_pattern, instructions)
+    |> List.flatten()
+    |> Enum.map(&convert_to_instruction/1)
+  end
+
+  def convert_to_instruction(mul) do
+    [a, b] =
+      mul
+      |> String.replace(~r/(mul|\(|\))/, "")
+      |> String.split(",")
+      |> Enum.map(&String.to_integer/1)
+
+    {:multiply, a, b}
+  end
+
+  def execute(instructions) when is_list(instructions) do
+    instructions
+    |> Enum.map(&execute/1)
+  end
+
+  def execute({:multiply, a, b}), do: a * b
+end
+```
+
+## Part 1
+
+```elixir
+part_1_test_input = Kino.Input.textarea("Please paste the test input for part 1:")
+```
+
+<!-- livebook:{"reevaluate_automatically":true} -->
+
+```elixir
+part_1_test_input
+|> Kino.Input.read()
+|> Instructions.extract_valid_multiplication()
+|> Instructions.execute()
+|> Enum.sum()
+```
+
+```elixir
+puzzle_input
+|> Kino.Input.read()
+|> Instructions.extract_valid_multiplication()
+|> Instructions.execute()
+|> Enum.sum()
+```
+
+## Part 2
+
+```elixir
+defmodule ConditionalInstructions do
+  @conditional_mul ~r/don't|do|mul\(\d+,\d+\)/
+
+  def extract_valid_multiplication(instructions) do
+    Regex.scan(@conditional_mul, instructions)
+    |> List.flatten()
+    |> Enum.reduce({:enabled, []}, fn
+      statement, {accept, valid} ->
+        case statement do
+          "don't" ->
+            {:disabled, valid}
+
+          "do" ->
+            {:enabled, valid}
+
+          multiplication ->
+            if accept == :enabled do
+              {accept, [multiplication | valid]}
+            else
+              {accept, valid}
+            end
+        end
+    end)
+    |> then(fn {_state, valid} ->
+      valid
+    end)
+    |> Enum.map(&Instructions.convert_to_instruction/1)
+  end
+end
+```
+
+```elixir
+part_2_test_input = Kino.Input.textarea("Please paste the test input for part 2:")
+```
+
+<!-- livebook:{"reevaluate_automatically":true} -->
+
+```elixir
+part_2_test_input
+|> Kino.Input.read()
+|> ConditionalInstructions.extract_valid_multiplication()
+|> Instructions.execute()
+|> Enum.sum()
+```
+
+```elixir
+puzzle_input
+|> Kino.Input.read()
+|> ConditionalInstructions.extract_valid_multiplication()
+|> Instructions.execute()
+|> Enum.sum()
+```
