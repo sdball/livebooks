@@ -1,0 +1,341 @@
+# Advent of Code - 2024 - Day 4
+
+```elixir
+Mix.install([
+  {:kino, "~> 0.14.2"},
+  {:kino_vega_lite, "~> 0.1.13"},
+  {:kino_explorer, "~> 0.1.23"}
+])
+```
+
+## Puzzle Input
+
+```elixir
+puzzle_input = Kino.Input.textarea("Please paste the puzzle input:")
+```
+
+## Part 1
+
+```elixir
+part_1_test_input = Kino.Input.textarea("Please paste the test input for part 1:")
+```
+
+```elixir
+defmodule WordSearch do
+  @neighbors [
+    {-1, -1},
+    {-1, 0},
+    {-1, 1},
+    {0, -1},
+    {0, 1},
+    {1, -1},
+    {1, 0},
+    {1, 1}
+  ]
+
+  defstruct grid: %{}, pattern: nil, found: [], width: 0, height: 0
+
+  def new(text) do
+    grid =
+      text
+      |> String.split("\n")
+      |> Enum.map(&(String.split(&1, "", trim: true) |> Enum.with_index()))
+      |> Enum.with_index()
+      |> Enum.reduce(_grid = %{}, fn {row, row_index}, acc ->
+        for {letter, letter_index} <- row, reduce: acc do
+          acc -> Map.put(acc, {row_index, letter_index}, letter)
+        end
+      end)
+
+    {{max_row, max_col}, _letter} = Enum.max(grid)
+
+    %__MODULE__{grid: grid, width: max_col + 1, height: max_row + 1}
+  end
+
+  def find(wordsearch = %__MODULE__{}, pattern) do
+    pattern = pattern |> String.split("", trim: true)
+    find(%{wordsearch | pattern: pattern})
+  end
+
+  def find(wordsearch = %__MODULE__{pattern: [head | tail], grid: grid}) do
+    grid
+    |> Enum.sort()
+    |> Enum.map(fn {pos, letter} ->
+      case letter do
+        ^head ->
+          look_around(wordsearch, pos, tail)
+          |> Enum.reject(&is_nil/1)
+
+        _ ->
+          nil
+      end
+    end)
+    |> Enum.reject(&is_nil/1)
+  end
+
+  def look_around(wordsearch, pos, [head | tail]) do
+    neighbors(wordsearch, pos)
+    |> Enum.filter(fn pos ->
+      wordsearch.grid[pos] == head
+    end)
+    |> Enum.map(fn next_pos ->
+      follow(wordsearch, [pos, next_pos], direction(pos, next_pos), tail)
+    end)
+  end
+
+  def follow(wordsearch, coordinates, direction, [head | tail]) do
+    last = List.last(coordinates)
+    next = next(last, direction)
+
+    if wordsearch.grid[next] == head do
+      follow(wordsearch, coordinates ++ [next], direction, tail)
+    end
+  end
+
+  def follow(_wordsearch, coordinates, _direction, []) do
+    coordinates
+  end
+
+  def direction({r1, c1}, {r2, c2}) do
+    row_delta = r2 - r1
+    col_delta = c2 - c1
+
+    cond do
+      row_delta == -1 and col_delta == -1 ->
+        :up_left
+
+      row_delta == -1 and col_delta == 0 ->
+        :up
+
+      row_delta == -1 and col_delta == 1 ->
+        :up_right
+
+      row_delta == 0 and col_delta == -1 ->
+        :left
+
+      row_delta == 0 and col_delta == 1 ->
+        :right
+
+      row_delta == 1 and col_delta == -1 ->
+        :down_left
+
+      row_delta == 1 and col_delta == 0 ->
+        :down
+
+      row_delta == 1 and col_delta == 1 ->
+        :down_right
+
+      true ->
+        {{r1, c1}, {r2, c2}}
+    end
+  end
+
+  def next({r, c}, :up_left), do: {r - 1, c - 1}
+  def next({r, c}, :up), do: {r - 1, c}
+  def next({r, c}, :up_right), do: {r - 1, c + 1}
+  def next({r, c}, :left), do: {r, c - 1}
+  def next({r, c}, :right), do: {r, c + 1}
+  def next({r, c}, :down_left), do: {r + 1, c - 1}
+  def next({r, c}, :down), do: {r + 1, c}
+  def next({r, c}, :down_right), do: {r + 1, c + 1}
+
+  def neighbors(%__MODULE__{width: width, height: height}, {row, col}) do
+    for {row_delta, col_delta} <- @neighbors do
+      {row + row_delta, col + col_delta}
+    end
+    |> Enum.filter(fn {row, col} ->
+      row >= 0 and col >= 0 and row < height and col < width
+    end)
+  end
+end
+```
+
+<!-- livebook:{"reevaluate_automatically":true} -->
+
+```elixir
+part_1_test_input
+|> Kino.Input.read()
+|> WordSearch.new()
+|> WordSearch.find("XMAS")
+|> Enum.map(&Enum.count/1)
+|> Enum.sum()
+```
+
+```elixir
+puzzle_input
+|> Kino.Input.read()
+|> WordSearch.new()
+|> WordSearch.find("XMAS")
+|> Enum.map(&Enum.count/1)
+|> Enum.sum()
+```
+
+## Part 2
+
+```elixir
+part_2_test_input = Kino.Input.textarea("Please paste the test input for part 2:")
+```
+
+```elixir
+defmodule XWordSearch do
+  @diagonals [
+    {-1, -1},
+    {-1, 1},
+    {1, -1},
+    {1, 1}
+  ]
+
+  defstruct grid: %{}, pattern: nil, found: [], width: 0, height: 0
+
+  def new(text) do
+    grid =
+      text
+      |> String.split("\n")
+      |> Enum.map(&(String.split(&1, "", trim: true) |> Enum.with_index()))
+      |> Enum.with_index()
+      |> Enum.reduce(_grid = %{}, fn {row, row_index}, acc ->
+        for {letter, letter_index} <- row, reduce: acc do
+          acc -> Map.put(acc, {row_index, letter_index}, letter)
+        end
+      end)
+
+    {{max_row, max_col}, _letter} = Enum.max(grid)
+
+    %__MODULE__{grid: grid, width: max_col + 1, height: max_row + 1}
+  end
+
+  def find(wordsearch = %__MODULE__{}, pattern) do
+    pattern = pattern |> String.split("", trim: true)
+    find(%{wordsearch | pattern: pattern})
+  end
+
+  def find(wordsearch = %__MODULE__{pattern: [head | tail], grid: grid}) do
+    grid
+    |> Enum.sort()
+    |> Enum.map(fn {pos, letter} ->
+      case letter do
+        ^head ->
+          look_around(wordsearch, pos, tail)
+          |> Enum.reject(&is_nil/1)
+
+        _ ->
+          nil
+      end
+    end)
+    |> Enum.reject(&is_nil/1)
+  end
+
+  def look_around(wordsearch, pos, [head | tail]) do
+    diagonals(wordsearch, pos)
+    |> Enum.filter(fn pos ->
+      wordsearch.grid[pos] == head
+    end)
+    |> Enum.map(fn next_pos ->
+      follow(wordsearch, [pos, next_pos], direction(pos, next_pos), tail)
+    end)
+  end
+
+  def follow(wordsearch, coordinates, direction, [head | tail]) do
+    last = List.last(coordinates)
+    next = next(last, direction)
+
+    if wordsearch.grid[next] == head do
+      follow(wordsearch, coordinates ++ [next], direction, tail)
+    end
+  end
+
+  def follow(_wordsearch, coordinates, _direction, []) do
+    coordinates
+  end
+
+  def direction({r1, c1}, {r2, c2}) do
+    row_delta = r2 - r1
+    col_delta = c2 - c1
+
+    cond do
+      row_delta == -1 and col_delta == -1 ->
+        :up_left
+
+      row_delta == -1 and col_delta == 0 ->
+        :up
+
+      row_delta == -1 and col_delta == 1 ->
+        :up_right
+
+      row_delta == 0 and col_delta == -1 ->
+        :left
+
+      row_delta == 0 and col_delta == 1 ->
+        :right
+
+      row_delta == 1 and col_delta == -1 ->
+        :down_left
+
+      row_delta == 1 and col_delta == 0 ->
+        :down
+
+      row_delta == 1 and col_delta == 1 ->
+        :down_right
+
+      true ->
+        {{r1, c1}, {r2, c2}}
+    end
+  end
+
+  def next({r, c}, :up_left), do: {r - 1, c - 1}
+  def next({r, c}, :up), do: {r - 1, c}
+  def next({r, c}, :up_right), do: {r - 1, c + 1}
+  def next({r, c}, :left), do: {r, c - 1}
+  def next({r, c}, :right), do: {r, c + 1}
+  def next({r, c}, :down_left), do: {r + 1, c - 1}
+  def next({r, c}, :down), do: {r + 1, c}
+  def next({r, c}, :down_right), do: {r + 1, c + 1}
+
+  def diagonals(%__MODULE__{width: width, height: height}, {row, col}) do
+    for {row_delta, col_delta} <- @diagonals do
+      {row + row_delta, col + col_delta}
+    end
+    |> Enum.filter(fn {row, col} ->
+      row >= 0 and col >= 0 and row < height and col < width
+    end)
+  end
+end
+```
+
+<!-- livebook:{"reevaluate_automatically":true} -->
+
+```elixir
+part_2_test_input
+|> Kino.Input.read()
+|> XWordSearch.new()
+|> XWordSearch.find("MAS")
+|> Enum.reduce([], fn found, acc ->
+  acc ++ found
+end)
+|> Enum.map(fn [_m, a, _s] ->
+  a
+end)
+|> Enum.frequencies()
+|> Enum.filter(fn {_pos, frequency} ->
+  frequency == 2
+end)
+|> Enum.count()
+```
+
+```elixir
+puzzle_input
+|> Kino.Input.read()
+|> XWordSearch.new()
+|> XWordSearch.find("MAS")
+|> Enum.reduce([], fn found, acc ->
+  acc ++ found
+end)
+|> Enum.map(fn [_m, a, _s] ->
+  a
+end)
+|> Enum.frequencies()
+|> Enum.filter(fn {_pos, frequency} ->
+  frequency == 2
+end)
+|> Enum.count()
+```
