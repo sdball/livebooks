@@ -39,7 +39,7 @@ defmodule WordSearch do
     grid =
       text
       |> String.split("\n")
-      |> Enum.map(&(String.split(&1, "", trim: true) |> Enum.with_index()))
+      |> Enum.map(&(String.graphemes(&1) |> Enum.with_index()))
       |> Enum.with_index()
       |> Enum.reduce(_grid = %{}, fn {row, row_index}, acc ->
         for {letter, letter_index} <- row, reduce: acc do
@@ -191,7 +191,7 @@ defmodule XWordSearch do
     grid =
       text
       |> String.split("\n")
-      |> Enum.map(&(String.split(&1, "", trim: true) |> Enum.with_index()))
+      |> Enum.map(&(String.graphemes(&1) |> Enum.with_index()))
       |> Enum.with_index()
       |> Enum.reduce(_grid = %{}, fn {row, row_index}, acc ->
         for {letter, letter_index} <- row, reduce: acc do
