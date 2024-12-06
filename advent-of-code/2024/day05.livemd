@@ -1,0 +1,240 @@
+# Advent of Code - 2024 - Day 5
+
+```elixir
+Mix.install([
+  {:kino, "~> 0.14.2"},
+  {:kino_vega_lite, "~> 0.1.13"},
+  {:kino_explorer, "~> 0.1.23"}
+])
+```
+
+## Puzzle Input
+
+```elixir
+puzzle_input = Kino.Input.textarea("Please paste the puzzle input:")
+```
+
+## Part 1
+
+```elixir
+part_1_test_input = Kino.Input.textarea("Please paste the test input for part 1:")
+```
+
+```elixir
+defmodule PrintingJob do
+  defstruct pages: []
+
+  def from_string(string) when is_binary(string) do
+    pages =
+      string
+      |> String.split(",")
+      |> Enum.map(&String.to_integer/1)
+
+    %__MODULE__{pages: pages}
+  end
+
+  def member?(job = %__MODULE__{}, page) when is_integer(page) do
+    Enum.member?(job.pages, page)
+  end
+
+  def find_index(job = %__MODULE__{}, find) when is_integer(find) do
+    Enum.find_index(job.pages, fn page ->
+      page == find
+    end)
+  end
+
+  def move_page(job = %__MODULE__{}, moving, after: after_page) do
+    moving_page_index = Enum.find_index(job.pages, &(&1 == moving))
+    after_page_index = Enum.find_index(job.pages, &(&1 == after_page))
+
+    new_pages =
+      job.pages
+      |> List.insert_at(after_page_index + 1, moving)
+      |> List.delete_at(moving_page_index)
+
+    %{job | pages: new_pages}
+  end
+end
+```
+
+```elixir
+defmodule PrintingJob.PageOrderingRule do
+  defstruct [:before, :after]
+
+  def from_string(notation) when is_binary(notation) do
+    [b, a] =
+      notation
+      |> String.split("|")
+
+    %__MODULE__{before: String.to_integer(b), after: String.to_integer(a)}
+  end
+end
+```
+
+```elixir
+defmodule PrintingJob.Validation.PageOrder do
+  def check(rule = %PrintingJob.PageOrderingRule{}, job = %PrintingJob{}) do
+    with :ok <- applies(rule, job), :ok <- passes(rule, job) do
+      true
+    else
+      {:error, :rule_does_not_apply} ->
+        true
+
+      {:error, :rule_does_not_pass} ->
+        false
+    end
+  end
+
+  def failing(rules, job = %PrintingJob{}) when is_list(rules) do
+    rules
+    |> Enum.filter(fn rule ->
+      :ok == applies(rule, job) && {:error, :rule_does_not_pass} == passes(rule, job)
+    end)
+  end
+
+  defp applies(rule = %PrintingJob.PageOrderingRule{}, job = %PrintingJob{}) do
+    if PrintingJob.member?(job, rule.before) and PrintingJob.member?(job, rule.after) do
+      :ok
+    else
+      {:error, :rule_does_not_apply}
+    end
+  end
+
+  defp passes(rule = %PrintingJob.PageOrderingRule{}, job = %PrintingJob{}) do
+    if PrintingJob.find_index(job, rule.before) < PrintingJob.find_index(job, rule.after) do
+      :ok
+    else
+      {:error, :rule_does_not_pass}
+    end
+  end
+end
+```
+
+```elixir
+defmodule SafetyManualUpdates do
+  defstruct rules: [], jobs: []
+
+  def from_string(string) when is_binary(string) do
+    [rules, jobs] =
+      string
+      |> String.split("\n\n")
+
+    rules =
+      rules
+      |> String.split("\n")
+      |> Enum.map(&PrintingJob.PageOrderingRule.from_string/1)
+
+    jobs =
+      jobs
+      |> String.split("\n")
+      |> Enum.map(&PrintingJob.from_string/1)
+
+    %__MODULE__{rules: rules, jobs: jobs}
+  end
+
+  def valid_jobs(updates = %__MODULE__{}) do
+    valid =
+      updates.jobs
+      |> Enum.filter(fn job ->
+        updates.rules
+        |> Enum.all?(fn rule ->
+          PrintingJob.Validation.PageOrder.check(rule, job)
+        end)
+      end)
+
+    %{updates | jobs: valid}
+  end
+
+  def middle_pages(%__MODULE__{jobs: jobs}) do
+    jobs
+    |> Enum.map(fn %{pages: pages} ->
+      middle = round(Enum.count(pages) / 2) - 1
+      Enum.at(pages, middle)
+    end)
+  end
+
+  def invalid_jobs(updates = %__MODULE__{}) do
+    valid = valid_jobs(updates)
+    invalid = updates.jobs -- valid.jobs
+    %{updates | jobs: invalid}
+  end
+
+  def correct_jobs(updates = %__MODULE__{}) do
+    new_updates = apply_page_order_rules(updates)
+
+    # apply rules until page ordering is stable
+    if updates.jobs == new_updates.jobs do
+      new_updates
+    else
+      correct_jobs(new_updates)
+    end
+  end
+
+  def apply_page_order_rules(updates = %__MODULE__{}) do
+    corrected =
+      updates.jobs
+      |> Enum.map(fn job ->
+        PrintingJob.Validation.PageOrder.failing(updates.rules, job)
+        |> Enum.reduce(job, fn rule, acc ->
+          if PrintingJob.Validation.PageOrder.check(rule, acc) do
+            acc
+          else
+            PrintingJob.move_page(acc, rule.after, after: rule.before)
+          end
+        end)
+      end)
+
+    %{updates | jobs: corrected}
+  end
+end
+```
+
+<!-- livebook:{"reevaluate_automatically":true} -->
+
+```elixir
+part_1_test_input
+|> Kino.Input.read()
+|> SafetyManualUpdates.from_string()
+|> SafetyManualUpdates.valid_jobs()
+|> SafetyManualUpdates.middle_pages()
+|> Enum.sum()
+```
+
+```elixir
+puzzle_input
+|> Kino.Input.read()
+|> SafetyManualUpdates.from_string()
+|> SafetyManualUpdates.valid_jobs()
+|> SafetyManualUpdates.middle_pages()
+|> Enum.sum()
+```
+
+## Part 2
+
+```elixir
+part_2_test_input = Kino.Input.textarea("Please paste the test input for part 2:")
+```
+
+<!-- livebook:{"reevaluate_automatically":true} -->
+
+```elixir
+part_2_test_input
+|> Kino.Input.read()
+|> SafetyManualUpdates.from_string()
+|> SafetyManualUpdates.invalid_jobs()
+|> SafetyManualUpdates.correct_jobs()
+|> SafetyManualUpdates.middle_pages()
+|> Enum.sum()
+```
+
+<!-- livebook:{"reevaluate_automatically":true} -->
+
+```elixir
+puzzle_input
+|> Kino.Input.read()
+|> SafetyManualUpdates.from_string()
+|> SafetyManualUpdates.invalid_jobs()
+|> SafetyManualUpdates.correct_jobs()
+|> SafetyManualUpdates.middle_pages()
+|> Enum.sum()
+```
