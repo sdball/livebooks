@@ -1,0 +1,370 @@
+# Advent of Code - 2024 - Day 6
+
+```elixir
+Mix.install([
+  {:kino, "~> 0.14.2"},
+  {:kino_vega_lite, "~> 0.1.13"},
+  {:kino_explorer, "~> 0.1.23"}
+])
+```
+
+## Puzzle Input
+
+```elixir
+puzzle_input = Kino.Input.textarea("Please paste the puzzle input:")
+```
+
+```elixir
+defmodule SituationMap.Tile.Guard do
+  defstruct visited: MapSet.new(),
+            facing: nil,
+            position: {},
+            looping: false
+
+  def next_tile(%__MODULE__{position: {row, column}, facing: :north}), do: {row - 1, column}
+  def next_tile(%__MODULE__{position: {row, column}, facing: :east}), do: {row, column + 1}
+  def next_tile(%__MODULE__{position: {row, column}, facing: :south}), do: {row + 1, column}
+  def next_tile(%__MODULE__{position: {row, column}, facing: :west}), do: {row, column - 1}
+
+  def pivot(guard = %__MODULE__{facing: direction, position: position}) do
+    guard
+    |> visit()
+    |> turn()
+    |> Map.put(:facing, next_direction(direction))
+    |> Map.update!(:visited, fn visited ->
+      MapSet.put(visited, {position, direction})
+    end)
+  end
+
+  def step(guard = %__MODULE__{}) do
+    guard
+    |> visit()
+    |> move()
+  end
+
+  def visit(guard = %__MODULE__{position: position, facing: direction}) do
+    if MapSet.member?(guard.visited, {position, direction}) do
+      %{guard | looping: true}
+    else
+      %{guard | visited: MapSet.put(guard.visited, {position, direction})}
+    end
+  end
+
+  def turn(guard = %__MODULE__{facing: direction}) do
+    %{guard | facing: next_direction(direction)}
+  end
+
+  def move(guard = %__MODULE__{}) do
+    %{guard | position: next_tile(guard)}
+  end
+
+  def unicode(%__MODULE__{looping: true}) do
+    "🌀"
+  end
+
+  def unicode(%__MODULE__{}) do
+    "💂‍♀️"
+  end
+
+  defp next_direction(:north), do: :east
+  defp next_direction(:east), do: :south
+  defp next_direction(:south), do: :west
+  defp next_direction(:west), do: :north
+end
+```
+
+```elixir
+defmodule SituationMap.Tile do
+  alias SituationMap.Tile.Guard
+
+  defstruct obstacle: false
+
+  def new(_string = "^", position) do
+    %Guard{facing: :north, position: position}
+  end
+
+  def new(_string = ">", position) do
+    %Guard{facing: :east, position: position}
+  end
+
+  def new(_string = "<", position) do
+    %Guard{facing: :west, position: position}
+  end
+
+  def new(_string = "v", position) do
+    %Guard{facing: :south, position: position}
+  end
+
+  def new("#", _position) do
+    %__MODULE__{obstacle: true}
+  end
+
+  def new(_string, _position) do
+    %__MODULE__{}
+  end
+end
+```
+
+```elixir
+defmodule SituationMap do
+  alias SituationMap.Tile
+  alias SituationMap.Tile.Guard
+
+  defstruct max_row: 0,
+            max_column: 0,
+            obstacles: MapSet.new(),
+            guard_left: false,
+            guard_looping: false,
+            guard: nil,
+            added_obstacle: nil
+
+  def from_string(string) do
+    rows =
+      string
+      |> String.split("\n")
+
+    for {line, row} <- Enum.with_index(rows),
+        {marker, column} <- Enum.with_index(String.graphemes(line)),
+        reduce: %__MODULE__{} do
+      acc ->
+        position = {row, column}
+
+        map =
+          case Tile.new(marker, position) do
+            guard = %Guard{} ->
+              %{acc | guard: guard}
+
+            %Tile{obstacle: true} ->
+              %{acc | obstacles: MapSet.put(acc.obstacles, {row, column})}
+
+            _empty ->
+              acc
+          end
+
+        %{
+          map
+          | max_row: Enum.max([map.max_row, row]),
+            max_column: Enum.max([map.max_column, column])
+        }
+    end
+  end
+
+  def step(map = %__MODULE__{guard_left: true}), do: map
+
+  def step(map = %__MODULE__{guard: guard}) do
+    {row, column} = Guard.next_tile(guard)
+
+    cond do
+      row < 0 or column < 0 or row > map.max_row or column > map.max_column ->
+        new_guard = Guard.visit(guard)
+        %{map | guard: new_guard, guard_left: true}
+
+      obstacle?(map, {row, column}) ->
+        new_guard = Guard.pivot(guard)
+        %{map | guard: new_guard}
+
+      true ->
+        new_guard = Guard.step(guard)
+        %{map | guard: new_guard, guard_looping: new_guard.looping}
+    end
+  end
+
+  def step_until_determined(map = %__MODULE__{guard_left: true}), do: map
+
+  def step_until_determined(map = %__MODULE__{guard_looping: true}), do: map
+
+  def step_until_determined(map = %__MODULE__{}) do
+    map
+    |> step()
+    |> step_until_determined()
+  end
+
+  def step_until_guard_leaves(map = %__MODULE__{}) do
+    determined = step_until_determined(map)
+
+    if determined.guard_looping do
+      {:error, :guard_did_not_leave, determined}
+    else
+      {:ok, determined}
+    end
+  end
+
+  def step_until_guard_leaves!(map = %__MODULE__{}) do
+    determined = step_until_determined(map)
+
+    if determined.guard_looping do
+      throw(GuardStuckLooping)
+    else
+      determined
+    end
+  end
+
+  def count_visited_tiles(%__MODULE__{guard: guard}) do
+    guard.visited
+    |> Enum.uniq_by(fn {position, _direction} -> position end)
+    |> Enum.count()
+  end
+
+  def obstacle?(%__MODULE__{obstacles: obstacles}, position) do
+    MapSet.member?(obstacles, position)
+  end
+
+  def render(map = %__MODULE__{}) do
+    map
+    |> unicode()
+    |> IO.puts()
+  end
+
+  def unicode(map = %__MODULE__{}) do
+    for row <- 0..map.max_row, column <- 0..map.max_column, into: %{} do
+      {{row, column}, "⬜️"}
+    end
+    |> then(fn grid ->
+      Enum.reduce(map.obstacles, grid, fn position, acc ->
+        Map.put(acc, position, "🟥")
+      end)
+    end)
+    |> then(fn grid ->
+      Enum.reduce(map.guard.visited, grid, fn {position, direction}, acc ->
+        case direction do
+          :north ->
+            Map.put(acc, position, "⬆️")
+
+          :east ->
+            Map.put(acc, position, "➡️")
+
+          :south ->
+            Map.put(acc, position, "⬇️")
+
+          :west ->
+            Map.put(acc, position, "⬅️")
+        end
+      end)
+    end)
+    |> then(fn grid ->
+      if map.guard_left do
+        grid
+      else
+        Map.put(grid, map.guard.position, Guard.unicode(map.guard))
+      end
+    end)
+    |> Enum.sort()
+    |> Enum.map(fn {_position, tile} ->
+      tile
+    end)
+    |> Enum.chunk_every(map.max_column + 1)
+    |> Enum.map(fn row ->
+      Enum.intersperse(row, " ")
+    end)
+    |> Enum.intersperse("\n")
+  end
+end
+```
+
+```elixir
+defmodule SituationMap.GuardPathAnalyzer do
+  def determine_single_changes_that_create_guard_loops(map = %SituationMap{}) do
+    initial_guard_position = map.guard.position
+
+    potential_changes =
+      map
+      |> SituationMap.step_until_determined()
+      |> then(fn analyzed ->
+        analyzed.guard.visited
+        |> Enum.map(fn {position, _direction} ->
+          position
+        end)
+      end)
+      |> Enum.reject(fn position ->
+        position == initial_guard_position
+      end)
+      |> MapSet.new()
+
+    potential_maps =
+      potential_changes
+      |> Enum.map(fn position ->
+        new_obstacles = MapSet.put(map.obstacles, position)
+        %{map | obstacles: new_obstacles, added_obstacle: position}
+      end)
+
+    potential_maps
+    |> Task.async_stream(fn map ->
+      SituationMap.step_until_determined(map)
+    end)
+    |> Stream.filter(fn {:ok, map} ->
+      map.guard_looping
+    end)
+    |> Enum.map(fn {:ok, map} ->
+      map.added_obstacle
+    end)
+  end
+end
+```
+
+## Part 1
+
+```elixir
+part_1_test_input = Kino.Input.textarea("Please paste the test input for part 1:")
+```
+
+<!-- livebook:{"reevaluate_automatically":true} -->
+
+```elixir
+part_1_test_input
+|> Kino.Input.read()
+|> SituationMap.from_string()
+|> SituationMap.step_until_guard_leaves!()
+|> then(fn map ->
+  SituationMap.render(map)
+  map
+end)
+|> SituationMap.count_visited_tiles()
+```
+
+```elixir
+button = Kino.Control.button("Step")
+```
+
+```elixir
+map = part_1_test_input
+|> Kino.Input.read()
+|> SituationMap.from_string()
+
+button
+|> Kino.Control.stream()
+|> Kino.animate(map, fn _event, map ->
+  new_map = SituationMap.step(map)
+  md = Kino.Markdown.new("<pre>#{SituationMap.unicode(new_map)}</pre>")
+  {:cont, md, new_map}
+end)
+```
+
+```elixir
+puzzle_input
+|> Kino.Input.read()
+|> SituationMap.from_string()
+|> SituationMap.step_until_guard_leaves!()
+|> SituationMap.count_visited_tiles()
+```
+
+## Part 2
+
+```elixir
+part_2_test_input = Kino.Input.textarea("Please paste the test input for part 2:")
+```
+
+```elixir
+part_2_test_input
+|> Kino.Input.read()
+|> SituationMap.from_string()
+|> SituationMap.GuardPathAnalyzer.determine_single_changes_that_create_guard_loops()
+|> Enum.count()
+```
+
+```elixir
+puzzle_input
+|> Kino.Input.read()
+|> SituationMap.from_string()
+|> SituationMap.GuardPathAnalyzer.determine_single_changes_that_create_guard_loops()
+|> Enum.count()
+```
