@@ -185,8 +185,8 @@ defmodule GameOfLifeTest do
   end
 
   test "step - blinker" do
-    blink_1 = [{1, 0}, {1, 1}, {1, 2}]
-    blink_2 = [{0, 1}, {1, 1}, {2, 1}]
+    blink_1 = MapSet.new([{1, 0}, {1, 1}, {1, 2}])
+    blink_2 = MapSet.new([{0, 1}, {1, 1}, {2, 1}])
 
     blink_1
     |> assert_step(blink_2)
