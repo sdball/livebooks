@@ -1,0 +1,204 @@
+# Advent of Code - 2024 - Day 7
+
+```elixir
+Mix.install([
+  {:kino, "~> 0.14.2"},
+  {:kino_vega_lite, "~> 0.1.13"},
+  {:kino_explorer, "~> 0.1.23"}
+])
+```
+
+## Puzzle Input
+
+```elixir
+puzzle_input = Kino.Input.textarea("Please paste the puzzle input:")
+```
+
+## Part 1
+
+```elixir
+defmodule Mordin do
+  def cartesian_product(values, n) do
+    cartesian_product(values, n, _products = [[]])
+  end
+
+  def cartesian_product(_values, 0, products), do: products
+
+  def cartesian_product(values, n, products) do
+    new_products = for product <- products, value <- values, do: [value | product]
+    cartesian_product(values, n - 1, new_products)
+  end
+
+  def operator_combinations(values) do
+    cartesian_product([&+/2, &*/2], Enum.count(values) - 1)
+  end
+end
+```
+
+```elixir
+defmodule Garrus do
+  def read_calibrations(string) do
+    string
+    |> String.split("\n")
+    |> Enum.map(fn line ->
+      [total, values] = String.split(line, ": ")
+      total = String.to_integer(total)
+      values = values |> String.split() |> Enum.map(&String.to_integer/1)
+      operator_combinations = Mordin.operator_combinations(values)
+
+      possible =
+        operator_combinations
+        |> Enum.any?(fn operators ->
+          check_sequence(total, values, operators)
+        end)
+
+      if possible do
+        total
+      else
+        0
+      end
+    end)
+  end
+
+  def check_sequence(total, values, operators) do
+    result =
+      values
+      |> Enum.with_index()
+      |> Enum.reduce([], fn {value, index}, acc ->
+        [Enum.at(operators, index) | [value | acc]]
+      end)
+      |> List.flatten()
+      |> Enum.reject(&is_nil/1)
+      |> Enum.reverse()
+      |> calculate_sequence()
+
+    result == total
+  end
+
+  def calculate_sequence([initial | terms]) do
+    terms
+    |> Enum.chunk_every(2)
+    |> Enum.reduce(initial, fn [op, b], acc ->
+      op.(acc, b)
+    end)
+  end
+end
+```
+
+```elixir
+part_1_test_input = Kino.Input.textarea("Please paste the test input for part 1:")
+```
+
+<!-- livebook:{"reevaluate_automatically":true} -->
+
+```elixir
+part_1_test_input
+|> Kino.Input.read()
+|> Garrus.read_calibrations()
+|> Enum.sum()
+```
+
+```elixir
+puzzle_input
+|> Kino.Input.read()
+|> Garrus.read_calibrations()
+|> Enum.sum()
+```
+
+## Part 2
+
+```elixir
+defmodule Tali do
+  def cartesian_product(values, n) do
+    cartesian_product(values, n, _products = [[]])
+  end
+
+  def cartesian_product(_values, 0, products), do: products
+
+  def cartesian_product(values, n, products) do
+    new_products = for product <- products, value <- values, do: [value | product]
+    cartesian_product(values, n - 1, new_products)
+  end
+
+  def operator_combinations(values) do
+    cartesian_product([:+, :*, :||], Enum.count(values) - 1)
+  end
+end
+```
+
+```elixir
+defmodule Liara do
+  def read_calibrations(string) do
+    string
+    |> String.split("\n")
+    |> Enum.map(fn line ->
+      [total, values] = String.split(line, ": ")
+      total = String.to_integer(total)
+      values = values |> String.split() |> Enum.map(&String.to_integer/1)
+      operator_combinations = Tali.operator_combinations(values)
+
+      possible =
+        operator_combinations
+        |> Enum.any?(fn operators ->
+          check_sequence(total, values, operators)
+        end)
+
+      if possible do
+        total
+      else
+        0
+      end
+    end)
+  end
+
+  def check_sequence(total, values, operators) do
+    result =
+      values
+      |> Enum.with_index()
+      |> Enum.reduce([], fn {value, index}, acc ->
+        [Enum.at(operators, index) | [value | acc]]
+      end)
+      |> List.flatten()
+      |> Enum.reject(&is_nil/1)
+      |> Enum.reverse()
+      |> calculate_sequence()
+
+    result == total
+  end
+
+  def calculate_sequence([initial | terms]) do
+    terms
+    |> Enum.chunk_every(2)
+    |> Enum.reduce(initial, fn [op, b], acc ->
+      case op do
+        :+ ->
+          acc + b
+
+        :* ->
+          acc * b
+
+        :|| ->
+          Integer.to_string(acc) <> Integer.to_string(b) |> String.to_integer()
+      end
+    end)
+  end
+end
+```
+
+```elixir
+part_2_test_input = Kino.Input.textarea("Please paste the test input for part 2:")
+```
+
+```elixir
+part_2_test_input
+|> Kino.Input.read()
+|> Liara.read_calibrations()
+|> Enum.sum()
+```
+
+```elixir
+puzzle_input
+|> Kino.Input.read()
+|> Liara.read_calibrations()
+|> Enum.sum()
+```
